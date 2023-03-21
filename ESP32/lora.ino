@@ -1,88 +1,68 @@
-/*******************************************************************************
- * Copyright (c) 2015 Thomas Telkamp and Matthijs Kooijman
- * Copyright (c) 2018 Terry Moore, MCCI
- *
- * Permission is hereby granted, free of charge, to anyone
- * obtaining a copy of this document and accompanying files,
- * to do whatever they want with them without any restriction,
- * including, but not limited to, copying, modification and redistribution.
- * NO WARRANTY OF ANY KIND IS PROVIDED.
- *
- * This example sends a valid LoRaWAN packet with payload "Hello,
- * world!", using frequency and encryption settings matching those of
- * the The Things Network.
- *
- * This uses OTAA (Over-the-air activation), where where a DevEUI and
- * application key is configured, which are used in an over-the-air
- * activation procedure where a DevAddr and session keys are
- * assigned/generated for use with all further communication.
- *
- * Note: LoRaWAN per sub-band duty-cycle limitation is enforced (1% in
- * g1, 0.1% in g2), but not the TTN fair usage policy (which is probably
- * violated by this sketch when left running for longer)!
-
- * To use this sketch, first register your application and device with
- * the things network, to set or generate an AppEUI, DevEUI and AppKey.
- * Multiple devices can use the same AppEUI, but each device has its own
- * DevEUI and AppKey.
- *
- * Do not forget to define the radio type correctly in
- * arduino-lmic/project_config/lmic_project_config.h or from your BOARDS.txt.
- *
- *******************************************************************************/
-
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
-#include <UUID.h>
+#include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEScan.h>
+#include <BLEAdvertisedDevice.h>
+#include <BLEBeacon.h>
+#include <ArduinoJson.h>
 
-//
-// For normal use, we require that you edit the sketch to replace FILLMEIN
-// with values assigned by the TTN console. However, for regression tests,
-// we want to be able to compile these scripts. The regression tests define
-// COMPILE_REGRESSION_TEST, and in that case we define FILLMEIN to a non-
-// working but innocuous value.
-//
-#ifdef COMPILE_REGRESSION_TEST
-#define FILLMEIN 0x260BC8EA
-#else
-#warning "You must replace the values marked FILLMEIN with real values from the TTN control panel!"
-#define FILLMEIN (#dont edit this, edit the lines that use FILLMEIN)
-#endif
-const int ledPin1 = 4;
-const int ledPin2 = 17;
-const int ledPin3 = 16;
-// This EUI must be in little-endian format, so least-significant-byte
-// first. When copying an EUI from ttnctl output, this means to reverse
-// the bytes. For TTN issued EUIs the last bytes should be 0xD5, 0xB3,
-// 0x70.
 static const u1_t PROGMEM APPEUI[8] = { 0x39, 0x27, 0x5E, 0x85, 0x6A, 0xAC, 0xC9, 0x36 };
+static const u1_t PROGMEM DEVEUI[8] = { 0x39, 0xB1, 0x05, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+static const u1_t PROGMEM APPKEY[16] = { 0x95, 0x48, 0x33, 0xF0, 0x18, 0x2F, 0x0C, 0x58, 0xA4, 0x13, 0x3D, 0x1E, 0x98, 0xE9, 0xA9, 0x73 };
+
+const int ledPin1 = 21;
+const int ledPin2 = 13;
+const int ledPin3 = 12;
+
+const int servoPinA1 = 17;
+const int servoPinA2 = 16;
+const int servoPinB1 = 4;
+const int servoPinB2 = 15;
+
+dr_t drSF = DR_SF7;
+
+unsigned int time_delay = 6;
+
+bool joined = false;
+bool founded = false;
+
 void os_getArtEui(u1_t* buf) {
   memcpy_P(buf, APPEUI, 8);
 }
-
-// This should also be in little endian format, see above.
-static const u1_t PROGMEM DEVEUI[8] = { 0x39, 0xB1, 0x05, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
 void os_getDevEui(u1_t* buf) {
   memcpy_P(buf, DEVEUI, 8);
 }
-
-// This key should be in big endian format (or, since it is not really a
-// number but a block of memory, endianness does not really apply). In
-// practice, a key taken from ttnctl can be copied as-is.
-static const u1_t PROGMEM APPKEY[16] = { 0x95, 0x48, 0x33, 0xF0, 0x18, 0x2F, 0x0C, 0x58, 0xA4, 0x13, 0x3D, 0x1E, 0x98, 0xE9, 0xA9, 0x73 };
 void os_getDevKey(u1_t* buf) {
   memcpy_P(buf, APPKEY, 16);
 }
-const char* serverUrl = "http://78.62.39.220/api/ttn";
-static uint8_t mydata[] = "O mama, Povilo";
+
+int scanTime = 1;
+BLEScan* pBLEScan;
+
+struct BeaconInfo {
+  std::string uuid;
+  int power;
+  int rssi;
+  int distance;
+};
+
+BeaconInfo beaconList[3];
+int beaconCount = 0;
+
+int calculateDistance(int txPower, int rssi) {
+  double ratio = pow(10, ((txPower - (rssi)) / (10 * 2.5)));
+  double distance = (ratio * 100.0) / 2.54;
+  int roundedDistance = (int)(distance);
+
+  return roundedDistance;
+}
+
+const unsigned TX_INTERVAL = 1;
 static osjob_t sendjob;
 
-// Schedule TX every this many seconds (might become longer due to duty
-// cycle limitations).
-const unsigned TX_INTERVAL = 2;
-
-// Pin mapping
 const lmic_pinmap lmic_pins = {
   .nss = 18,
   .rxtx = LMIC_UNUSED_PIN,
@@ -96,31 +76,149 @@ void printHex2(unsigned v) {
     Serial.print('0');
   Serial.print(v, HEX);
 }
-uint32_t start, stop, randomtime;
 
-void onEvent(ev_t ev) {
-  Serial.print(os_getTime());
-  Serial.print(": ");
-  switch (ev) {
-    case EV_SCAN_TIMEOUT:
-      Serial.println(F("EV_SCAN_TIMEOUT"));
-      break;
-    case EV_BEACON_FOUND:
-      Serial.println(F("EV_BEACON_FOUND"));
-      break;
-    case EV_BEACON_MISSED:
-      Serial.println(F("EV_BEACON_MISSED"));
-      break;
-    case EV_BEACON_TRACKED:
-      Serial.println(F("EV_BEACON_TRACKED"));
-      break;
-    case EV_JOINING:
-      LMIC_setDrTxpow(DR_SF10, 14);
-      LMIC_setAdrMode(1);
-      Serial.println(F("EV_JOINING"));
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+  void onResult(BLEAdvertisedDevice advertisedDevice) {
+    if (advertisedDevice.haveManufacturerData()) {
+      std::string strManufacturerData = advertisedDevice.getManufacturerData();
+
+      uint8_t cManufacturerData[100];
+      strManufacturerData.copy((char*)cManufacturerData, strManufacturerData.length(), 0);
+
+      if (strManufacturerData.length() == 25 && cManufacturerData[0] == 0x4C && cManufacturerData[1] == 0x00) {
+        BLEBeacon oBeacon = BLEBeacon();
+        oBeacon.setData(strManufacturerData);
+
+        uint16_t major = __builtin_bswap16(oBeacon.getMajor());
+        uint16_t minor = __builtin_bswap16(oBeacon.getMinor());
+
+        if (major == 10 && minor == 11) {
+          if (beaconCount < 3) {
+            BeaconInfo beaconInfo;
+            beaconInfo.uuid = oBeacon.getProximityUUID().toString();
+            beaconInfo.power = oBeacon.getSignalPower();
+            beaconInfo.rssi = advertisedDevice.getRSSI();
+            beaconInfo.distance = calculateDistance(beaconInfo.power, beaconInfo.rssi);
+            beaconList[beaconCount++] = beaconInfo;
+          }
+        }
+      }
+    }
+  }
+};
+void do_send(osjob_t* j) {
+  StaticJsonDocument<128> json;
+  if (!joined) {
+    json["Working"] = "true";
+    String jsonString;
+    serializeJson(json, jsonString);
+    char buffer[jsonString.length() + 1];
+    jsonString.toCharArray(buffer, jsonString.length() + 1);
+    Serial.println(buffer);
+    LMIC_setTxData2(1, (uint8_t*)buffer, strlen(buffer), 0);
+    Serial.println(F("Packet queued"));
+  } else {
+    if (!founded) {
+      BLEScanResults foundDevices = pBLEScan->start(scanTime, true);
+      pBLEScan->clearResults();
+      for (int i = 0; i < beaconCount; i++) {
+        for (int j = i + 1; j < beaconCount; j++) {
+          if (beaconList[j].distance < beaconList[i].distance) {
+            BeaconInfo temp = beaconList[i];
+            beaconList[i] = beaconList[j];
+            beaconList[j] = temp;
+          }
+        }
+      }
+    }
+    if (beaconCount != 0) {
+      founded = true;
+
+      json["uuid"] = beaconList[0].uuid;
+      json["distance"] = beaconList[0].distance;
+      json["rssi"] = beaconList[0].rssi;
+
+      String jsonString;
+      serializeJson(json, jsonString);
+      char buffer[jsonString.length() + 1];
+      jsonString.toCharArray(buffer, jsonString.length() + 1);
+      Serial.println(buffer);
       digitalWrite(ledPin1, LOW);
       digitalWrite(ledPin2, HIGH);
       digitalWrite(ledPin3, LOW);
+      LMIC_setTxData2(1, (uint8_t*)buffer, strlen(buffer), 0);
+      Serial.println(F("Packet queued"));
+    } else {
+      Serial.println(F("Nera duomenu"));
+      LMIC_sendAlive();
+    }
+  }
+}
+
+void servo1() {
+  //A+,B+
+  digitalWrite(servoPinA1, HIGH);
+  digitalWrite(servoPinA2, LOW);
+  digitalWrite(servoPinB1, HIGH);
+  digitalWrite(servoPinB2, LOW);
+  delay(time_delay);
+}
+
+void servo2() {
+  //A+,B-
+  digitalWrite(servoPinA1, HIGH);
+  digitalWrite(servoPinA2, LOW);
+  digitalWrite(servoPinB1, LOW);
+  digitalWrite(servoPinB2, HIGH);
+  delay(time_delay);
+}
+
+void servo3() {
+  //A-,B-
+  digitalWrite(servoPinA1, LOW);
+  digitalWrite(servoPinA2, HIGH);
+  digitalWrite(servoPinB1, LOW);
+  digitalWrite(servoPinB2, HIGH);
+  delay(time_delay);
+}
+
+void servo4() {
+  //A-,B+
+  digitalWrite(servoPinA1, LOW);
+  digitalWrite(servoPinA2, HIGH);
+  digitalWrite(servoPinB1, HIGH);
+  digitalWrite(servoPinB2, LOW);
+  delay(time_delay);
+}
+void closing(long st) {
+  long i = 0;
+  while (i < st) {
+    servo1();
+    servo2();
+    servo3();
+    servo4();
+    i++;
+  }
+}
+void opening(long st) {
+  long i = 0;
+  while (i < st) {
+    servo1();
+    servo4();
+    servo3();
+    servo2();
+    i++;
+  }
+}
+void onEvent(ev_t ev) {
+  Serial.print(os_getTime());
+  Serial.print(": ");
+  String status;
+  switch (ev) {
+    case EV_JOINING:
+      LMIC_setDrTxpow(drSF, 14);
+      LMIC_setAdrMode(0);
+      Serial.println(F("EV_JOINING"));
       break;
     case EV_JOINED:
       Serial.println(F("EV_JOINED"));
@@ -149,19 +247,8 @@ void onEvent(ev_t ev) {
         }
         Serial.println();
       }
-      // Disable link check validation (automatically enabled
-      // during join, but because slow data rates change max TX
-      // size, we don't use it in this example.
-      LMIC_setLinkCheckMode(1);
+      LMIC_setLinkCheckMode(0);
       break;
-    /*
-        || This event is defined but not used in the code. No
-        || point in wasting codespace on it.
-        ||
-        || case EV_RFU1:
-        ||     Serial.println(F("EV_RFU1"));
-        ||     break;
-        */
     case EV_JOIN_FAILED:
       Serial.println(F("EV_JOIN_FAILED"));
       break;
@@ -169,65 +256,45 @@ void onEvent(ev_t ev) {
       Serial.println(F("EV_REJOIN_FAILED"));
       break;
     case EV_TXCOMPLETE:
+      joined = true;
+      founded = false;
+      memset(beaconList, 0, sizeof(beaconList));
+      beaconCount = 0;
       Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+      if (LMIC.dataLen) {
+        StaticJsonDocument<128> json;
+        deserializeJson(json, LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
+        status = json["status"].as<String>();
+        Serial.print("Received status: ");
+        Serial.println(status);
+        if (strcasecmp(status.c_str(), "open") == 0) {
+          digitalWrite(ledPin1, HIGH);
+          digitalWrite(ledPin2, LOW);
+          digitalWrite(ledPin3, LOW);
+          servoWork();
+        } else {
+          digitalWrite(ledPin1, LOW);
+          digitalWrite(ledPin2, LOW);
+          digitalWrite(ledPin3, HIGH);
+        }
+      } else {
+        digitalWrite(ledPin1, LOW);
+        digitalWrite(ledPin2, LOW);
+        digitalWrite(ledPin3, HIGH);
+      }
+      os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
+      break;
+    case EV_TXSTART:
+      Serial.println(F("EV_TXSTART"));
+      break;
+    case EV_JOIN_TXCOMPLETE:
       digitalWrite(ledPin1, LOW);
       digitalWrite(ledPin2, LOW);
       digitalWrite(ledPin3, HIGH);
-      if (LMIC.txrxFlags & TXRX_ACK)
-        Serial.println(F("Received ack"));
-      if (LMIC.dataLen) {
-        Serial.print(F("Received "));
-        Serial.print(LMIC.dataLen);
-        Serial.println(F(" bytes of payload"));
-      }
-      // Schedule next transmission
-      os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
-      break;
-    case EV_LOST_TSYNC:
-      Serial.println(F("EV_LOST_TSYNC"));
-      break;
-    case EV_RESET:
-      Serial.println(F("EV_RESET"));
-      break;
-    case EV_RXCOMPLETE:
-      // data received in ping slot
-      Serial.println(F("EV_RXCOMPLETE"));
-      break;
-    case EV_LINK_DEAD:
-      Serial.println(F("EV_LINK_DEAD"));
-      break;
-    case EV_LINK_ALIVE:
-      Serial.println(F("EV_LINK_ALIVE"));
-      break;
-    /*
-        || This event is defined but not used in the code. No
-        || point in wasting codespace on it.
-        ||
-        || case EV_SCAN_FOUND:
-        ||    Serial.println(F("EV_SCAN_FOUND"));
-        ||    break;
-        */
-    case EV_TXSTART:
-      LMIC_setDrTxpow(DR_SF10, 14);
-      LMIC_setAdrMode(1);
-      Serial.println(F("EV_TXSTART"));
-      break;
-    case EV_TXCANCELED:
-      Serial.println(F("EV_TXCANCELED"));
-      break;
-    case EV_RXSTART:
-      /* do not print anything -- it wrecks timing */
-      break;
-    case EV_JOIN_TXCOMPLETE:
-      digitalWrite(ledPin1, HIGH);
-      digitalWrite(ledPin2, LOW);
-      digitalWrite(ledPin3, LOW);
       Serial.println(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
       delay(100);
-      ESP.restart(); 
-
+      ESP.restart();
       break;
-
     default:
       Serial.print(F("Unknown event: "));
       Serial.println((unsigned)ev);
@@ -235,62 +302,38 @@ void onEvent(ev_t ev) {
   }
 }
 
-
-String generateUUID() {
-  UUID uuid;
-  uint32_t seed1 = random(999999999);
-  uint32_t seed2 = random(999999999);
-  start = micros();
-  uuid.seed(seed1, seed2);
-  stop = micros();
-  uuid.generate();
-  return uuid.toCharArray();
-}
-
-void do_send(osjob_t* j) {
-  
-  // Generate a random UUID
-  String uuid = generateUUID();
-  digitalWrite(ledPin1, LOW);
-  digitalWrite(ledPin2, HIGH);
-  digitalWrite(ledPin3, LOW);
-  unsigned char buffer[37];
-  Serial.println(uuid);
-
-  memcpy(buffer, uuid.c_str(), uuid.length() + 1);
-  // Prepare upstream data transmission at the next possible time.
-  LMIC_setTxData2(1, buffer, uuid.length(), 0);
-  Serial.println(F("Packet queued"));
+void servoWork() {
+  opening(14);
+  delay(4000);
+  closing(14);
 }
 
 void setup() {
   Serial.begin(9600);
-  Serial.println(F("Starting"));
+  BLEDevice::init("");
+  pBLEScan = BLEDevice::getScan();
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setActiveScan(true);
+  pBLEScan->setInterval(100);
+  pBLEScan->setWindow(99);
   pinMode(ledPin1, OUTPUT);
   pinMode(ledPin2, OUTPUT);
   pinMode(ledPin3, OUTPUT);
   digitalWrite(ledPin1, LOW);
   digitalWrite(ledPin2, LOW);
   digitalWrite(ledPin3, LOW);
-  // #ifdef VCC_ENABLE
-  //   // For Pinoccio Scout boards
-  //   pinMode(VCC_ENABLE, OUTPUT);
-  //   digitalWrite(VCC_ENABLE, HIGH);
-
-  //   delay(1000);
-  // #endif
-
-  // LMIC init
+  pinMode(servoPinA1, OUTPUT);
+  pinMode(servoPinA2, OUTPUT);
+  pinMode(servoPinB1, OUTPUT);
+  pinMode(servoPinB2, OUTPUT);
+  closing(20);
+  delay(1000);
   os_init();
-  // Reset the MAC state. Session and pending data transfers will be discarded.
   LMIC_reset();
-  // LMIC_enableChannel(1);
   LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
-  LMIC_setLinkCheckMode(1);
-  LMIC_setDrTxpow(DR_SF10, 14);
-  LMIC_setAdrMode(1);
-  // LMIC_selectSubBand(1);
-  // Start job (sending automatically starts OTAA too)
+  LMIC_setLinkCheckMode(0);
+  LMIC_setDrTxpow(drSF, 14);
+  LMIC_setAdrMode(0);
   do_send(&sendjob);
 }
 
