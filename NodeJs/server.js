@@ -1,20 +1,137 @@
-const crypto = require('crypto');
-const uuid = require('uuid');
 const express = require('express');
 const mysql = require('mysql');
 const bodyParser = require('body-parser');
-var bcrypt = require('bcrypt');
+const { base64encode, base64decode } = require('nodejs-base64');
+const mqtt = require('mqtt');
+const Buffer = require('buffer').Buffer;
+const bcrypt = require('bcrypt');
 
-var con = mysql.createConnection({
+const app = express();
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+const con = mysql.createConnection({
   host: 'localhost',
   user: 'pvp_mysql',
   password: 'K233LARAVEL',
   database: 'pvp',
 });
 
-var app = express();
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+const mqttHost = 'eu1.cloud.thethings.network';
+const mqttUsername = 'parking-system-ktu@ttn';
+const mqttPassword =
+  'NNSXS.RU57MNKXUNSHCYRRXUYOMAWGJ5K7E3CIQNGKNMQ.7EK3MG3I5AGALHVBFBNJ662FFXX3VIK2OCSXNVCQYJAQY3ZIEXKA';
+const mqttClientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8);
+
+const mqttOptions = {
+  port: 8883,
+  host: mqttHost,
+  clientId: mqttClientId,
+  username: mqttUsername,
+  password: mqttPassword,
+  keepalive: 60,
+  reconnectPeriod: 1000,
+  protocol: 'mqtts',
+};
+
+const client = mqtt.connect(mqttOptions);
+
+// MQTT setup
+client.on('connect', function () {
+  console.log('Client connected to TTN');
+  client.subscribe('#');
+});
+
+client.on('error', function (err) {
+  console.log(err);
+});
+
+client.on('message', function (topic, message) {
+  try {
+    const getDataFromTTN = JSON.parse(message);
+    const rawData = getDataFromTTN.uplink_message.frm_payload;
+    const decoded = base64decode(rawData);
+    const data = JSON.parse(decoded);
+
+    const applicationID =
+      getDataFromTTN.end_device_ids.application_ids.application_id;
+    const endDeviceID = getDataFromTTN.end_device_ids.device_id;
+    const topic = `v3/${applicationID}@ttn/devices/${endDeviceID}/down/push`;
+
+    if ('Working' in data) {
+      console.log(`Working: ${data.Working}`);
+    } else {
+      if (data.distance <= 100) {
+        con.query(
+          'SELECT * FROM user where uuid=?',
+          [data.uuid],
+          function (err, result, fields) {
+            con.on('error', function (err) {
+              console.log('[MySQL ERROR]', err);
+            });
+            if (result && result.length) {
+              console.log('Įleidžiama');
+              console.table(data);
+
+              // Prepare the message to be sent back to TTN
+              const messageToSend = {
+                downlinks: [
+                  {
+                    f_port: getDataFromTTN.uplink_message.f_port,
+                    frm_payload: Buffer.from(
+                      JSON.stringify({ status: 'open' })
+                    ).toString('base64'),
+                  },
+                ],
+              };
+
+              // Convert messageToSend to a Buffer object
+              const buffer = Buffer.from(JSON.stringify(messageToSend));
+
+              client.publish(topic, buffer);
+            } else {
+              const messageToSend = {
+                downlinks: [
+                  {
+                    f_port: getDataFromTTN.uplink_message.f_port,
+                    frm_payload: Buffer.from(
+                      JSON.stringify({ status: 'error' })
+                    ).toString('base64'),
+                  },
+                ],
+              };
+
+              // Convert messageToSend to a Buffer object
+              const buffer = Buffer.from(JSON.stringify(messageToSend));
+
+              client.publish(topic, buffer);
+              console.log('UUID nerastas!');
+            }
+          }
+        );
+      } else {
+        const messageToSend = {
+          downlinks: [
+            {
+              f_port: getDataFromTTN.uplink_message.f_port,
+              frm_payload: Buffer.from(
+                JSON.stringify({ status: 'closed' })
+              ).toString('base64'),
+            },
+          ],
+        };
+
+        // Convert messageToSend to a Buffer object
+        const buffer = Buffer.from(JSON.stringify(messageToSend));
+
+        client.publish(topic, buffer);
+        console.log('Atstumas perdidelis');
+      }
+    }
+  } catch (err) {
+    console.log('Nėra info');
+  }
+});
 
 app.post('/login/', (req, resData, next) => {
   var post_data = req.body;
