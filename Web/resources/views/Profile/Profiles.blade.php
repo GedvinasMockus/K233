@@ -11,16 +11,13 @@
                             <th>Pavarde</th>
                             <th>Email</th>
                         </tr>
-                        <tr data-href="/Profile/1">
-                            <td>Jonas</td>
-                            <td>Pavarde</td>
-                            <td>Email@email.com</td>
-                        </tr>
-                        <tr data-href="/Profile/2">
-                            <td>Povilas</td>
-                            <td>Petraitis</td>
-                            <td>Hmm@email.com</td>
-                        </tr>
+                        @foreach($users as $user)
+                            <tr data-href="/Profile/{{$user->id}}">
+                                <td>{{$user->name}}</td>
+                                <td>{{$user->surname}}</td>
+                                <td>{{$user->email}}</td>
+                            </tr>
+                        @endforeach
                     </table>
                 </div>
             </div>

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -123,7 +124,10 @@ class UserController extends Controller
 
     public function DisplayProfiles()
     {
-        return view('Profile.Profiles');
+        $users = DB::table('user')->select('id', 'name', 'surname', 'email')->get();
+        // dd($users);
+
+        return view('Profile.Profiles', ['users' => $users]);
     }
 
     public function DisplayProfile($id)
