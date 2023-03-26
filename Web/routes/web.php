@@ -37,7 +37,15 @@ Route::Get('/User_Profile', [UserController::class, 'DisplayUserProfile'])->name
 
 Route::Get('/Profiles', [UserController::class, 'DisplayProfiles'])->name('DisplayProfiles');
 
-Route::get('/Profile/{id}', [UserController::class, 'DisplayProfile']);
+Route::get('/Profile/{id}', [UserController::class, 'DisplayProfile'])->name('DisplayProfile');
+
+Route::get('/Profile/{id}/ban', [UserController::class, 'BanUser'])->name('BanUser');
+
+Route::get('/Profile/{id}/unban', [UserController::class, 'UnbanUser'])->name('UnbanUser');
+
+Route::get('/Profile/{id}/change_status', [UserController::class, 'DisplayChangeStatus'])->name('DisplayChangeStatus');
+
+Route::post('/Change_User_Status', [UserController::class, 'ChangeStatus'])->name('ChangeStatus');
 
 Route::Get('/History', [UserController::class, 'DisplayHistory'])->name('DisplayHistory');
 

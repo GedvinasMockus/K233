@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReservationController extends Controller
 {
     public function DisplayParkingLots()
     {
-        return view('Reservation.Parking_Lots');
+        $lots = DB::table('parking_lot')->select('id', 'parking_name', 'city', 'street', 'street_number')->get();
+
+        return view('Reservation.Parking_Lots', ['lots' => $lots]);
     }
 
     public function DisplayParkingLot($id)

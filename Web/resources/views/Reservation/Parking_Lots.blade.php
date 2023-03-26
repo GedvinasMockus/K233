@@ -16,16 +16,13 @@
                             <th>Adresas</th>
                             <th></th>
                         </tr>
-                        <tr data-href="/Parking_Lot/1">
-                            <td>Santaka</td>
-                            <td>Kaunas</td>
-                            <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
-                        </tr>
-                        <tr data-href="/Parking_Lot/2">
-                            <td>Akropolis</td>
-                            <td>Kaunas</td>
-                            <td><a href="/Edit_Parking_Lot/2" class="btn btn-danger">Redaguoti</a></td>
-                        </tr>
+                        @foreach($lots as $lot)
+                            <tr data-href="/Parking_Lot/{{$lot->id}}">
+                                <td>{{$lot->parking_name}}</td>
+                                <td>{{$lot->city}} {{$lot->street}} {{$lot->street_number}}</td>
+                                <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
+                            </tr>
+                        @endforeach
                     </table>
                 </div>
             </div>
