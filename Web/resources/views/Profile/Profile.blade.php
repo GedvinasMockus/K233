@@ -9,10 +9,14 @@
                     <a href="" class="btn btn-primary">Redaguoti</a>
                 </div>
                 <div class="col-4 text-center">
-                    <a href="" class="btn btn-primary">Blokuoti</a>
+                    @if ($isblocked === False) 
+                        <a href="/Profile/{{$id}}/ban" class="btn btn-primary">Blokuoti</a>
+                    @else
+                        <a href="/Profile/{{$id}}/unban" class="btn btn-primary">Atblokuoti</a>
+                    @endif
                 </div>
                 <div class="col-4 text-center">
-                    <a href="" class="btn btn-primary">Keisti statusą</a>
+                    <a href="/Profile/{{$id}}/change_status" class="btn btn-primary">Keisti statusą</a>
                 </div>
             </div>
         </div>

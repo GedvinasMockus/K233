@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
@@ -132,12 +133,64 @@ class UserController extends Controller
 
     public function DisplayProfile($id)
     {
-        return view('Profile.Profile', ['id' => $id]);
+        if(DB::table('user')->where('id', $id)->first()->role == 3)
+        {
+            $isblocked = True;
+        }
+        else
+        {
+            $isblocked = False;
+        }
+
+        return view('Profile.Profile', ['id' => $id], ['isblocked' => $isblocked]);
+    }
+
+    public function BanUser($id)
+    {
+        $temp = DB::table('user')->where('id', $id)->update(['role' => 3]);
+
+        return redirect()->route('DisplayProfile', ['id' => $id]);
+    }
+
+    public function UnbanUser($id)
+    {
+        $temp = DB::table('user')->where('id', $id)->update(['role' => 1]);
+
+        return redirect()->route('DisplayProfile', ['id' => $id]);
     }
 
     public function DisplayHistory()
     {
-        return view('Profile.History');
+        $id = Auth::user()->id;
+        $currentdate = Carbon::now()->toDateTimeString();
+
+        $pastreservations = DB::table('reservation')->join('parking_space', 'reservation.fk_Parking_spaceid', '=', 'parking_space.id')->join('parking_lot', 'parking_space.fk_Parking_lotid', '=', 'parking_lot.id')->select('reservation.id', 'reservation.date_from', 'reservation.date_until', 'parking_lot.parking_name')->where('fk_Userid', $id)->where('date_until', '<=', $currentdate)->get();
+
+        return view('Profile.History', ['pastreservations' => $pastreservations]);
+    }
+
+    public function DisplayChangeStatus($id)
+    {
+        $user = Auth::user();
+        $statuses = DB::table('user_role')->where('id_User_role', '!=', 3)->get();
+
+        $statuseslt = ['Nepatvirtintas vartotojas', 'Paprastas vartotojas', 'Administratorius'];
+
+        return view('Profile.Change_status', compact('user', 'statuses', 'statuseslt'));
+    }
+
+    public function ChangeStatus(Request $request)
+    {
+        $newstatus = $request->input('status');
+        $userid = $request->input('userid');
+
+        $status = DB::table('user_role')->select('id_User_role')->where('name', $newstatus)->first();
+
+        $statusid = $status->id_User_role;
+
+        DB::table('user')->where('id', $userid)->update(['role' => $statusid]);
+
+        return redirect()->route('DisplayProfile', ['id' => $userid]);
     }
     public function DisplayBalance()
     {
