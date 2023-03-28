@@ -3,9 +3,7 @@
     {{ $message }}
 </div>
 @endif @if ($message=Session::get('error'))
-<div class="alert alert-danger">
-    {{ $message }}
-</div>
+<div class="alert alert-danger">{!! str_replace('<br />', '<br />', $message) !!}</div>
 @endif @if ($message=Session::get('errorNotConfirmed'))
 <div class="alert alert-danger">
     {{ $message }}<br />

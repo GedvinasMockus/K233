@@ -6,7 +6,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -31,9 +34,15 @@ class User extends Authenticatable
     {
         return $this->password;
     }
-    public function getEmailAttribute()
+
+    public function generateEmailVerificationToken()
     {
-        return $this->email;
+        $token = Str::random(60);
+        $cacheKey = 'email_verification_' . $token;
+        Cache::put($cacheKey, $this->id, now()->addMinutes(60));
+        return $token;
     }
+
+
     public $timestamps = false;
 }
