@@ -31,13 +31,13 @@
                         <span class="text-danger">{{ $errors->first('email') }}</span>
                         @endif
                     </div>
-                    <!-- <div class="form-floating mb-3">
+                    <div class="form-floating mb-3">
                         <input type="text" name="phone" class="form-control" placeholder="Telefono numeris" @if(!empty(old("phone"))) value="{{ old("phone") }}" @else value="+370" @endif id="floatingPhone" pattern="(\+370)\d{8}" />
                         <label for="floatingEmail">Telefono numeris</label>
                         @if($errors->has('phone'))
                         <span class="text-danger">{{ $errors->first('phone') }}</span>
                         @endif
-                    </div> -->
+                    </div>
                     <div class="form-floating mb-3">
                         <input type="password" name="password" class="form-control" placeholder="Slaptažodis" id="floatingPassword" />
                         <label for="floatingPassword">Slaptažodis</label>

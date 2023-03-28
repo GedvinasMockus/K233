@@ -31,9 +31,15 @@ Route::get('/Register', [UserController::class, 'DisplayRegister'])->name('Regis
 
 Route::post('Validate_Reg', [UserController::class, 'Validate_Reg'])->name('Validate_Reg');
 
+Route::get('/Verify-email/{token}', [UserController::class, 'Verify_Reg'])->name('Auth.Verify');
+
 Route::Get('/Logout', [UserController::class, 'Logout'])->name('Logout')->middleware('auth');
 
 Route::Get('/User_Profile', [UserController::class, 'DisplayUserProfile'])->name('DisplayUserProfile');
+
+Route::post('/User_Profile/EditData', [UserController::class, 'Edit_user_data'])->name('Edit_user_data');
+
+Route::get('GetUserInfo', [UserController::class, 'GetUserInfo'])->name('GetUserInfo')->middleware('auth');
 
 Route::Get('/Profiles', [UserController::class, 'DisplayProfiles'])->name('DisplayProfiles');
 

@@ -58,12 +58,14 @@
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link text-uppercase dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fa-solid fa-circle-user me-1"> </i>
+                                <i class="fa-solid fa-circle-user me-1"></i>
+                                {{ Auth::user()->name }}
+                                {{ Auth::user()->surname }}
                             </a>
 
                             <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
                                 <li>
-                                    <a class="dropdown-item" href="">Test</a>
+                                    <a class="dropdown-item" href="{{ route('DisplayUserProfile') }}">Mano profilis</a>
                                 </li>
                                 <li>
                                     <hr class="dropdown-divider" />
