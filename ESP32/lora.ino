@@ -60,7 +60,7 @@ int calculateDistance(int txPower, int rssi) {
   return roundedDistance;
 }
 
-const unsigned TX_INTERVAL = 1;
+const unsigned TX_INTERVAL = 3;
 static osjob_t sendjob;
 
 const lmic_pinmap lmic_pins = {
@@ -95,6 +95,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         if (major == 10 && minor == 11) {
           if (beaconCount < 3) {
             BeaconInfo beaconInfo;
+
             beaconInfo.uuid = oBeacon.getProximityUUID().toString();
             beaconInfo.power = oBeacon.getSignalPower();
             beaconInfo.rssi = advertisedDevice.getRSSI();
@@ -134,19 +135,23 @@ void do_send(osjob_t* j) {
     if (beaconCount != 0) {
       founded = true;
 
-      json["uuid"] = beaconList[0].uuid;
-      json["distance"] = beaconList[0].distance;
-      json["rssi"] = beaconList[0].rssi;
+      std::string str = beaconList[0].uuid;
 
-      String jsonString;
-      serializeJson(json, jsonString);
-      char buffer[jsonString.length() + 1];
-      jsonString.toCharArray(buffer, jsonString.length() + 1);
-      Serial.println(buffer);
+      str.erase(std::remove_if(str.begin(), str.end(), [](char c) {
+                  return c == '-';
+                }),
+                str.end());
+      std::string combined = str + std::to_string(beaconList[0].distance);
+
+      Serial.println(beaconList[0].uuid.c_str());
+      Serial.println(beaconList[0].distance);
+
       digitalWrite(ledPin1, LOW);
       digitalWrite(ledPin2, HIGH);
       digitalWrite(ledPin3, LOW);
-      LMIC_setTxData2(1, (uint8_t*)buffer, strlen(buffer), 0);
+      LMIC_setTxData2(1, (uint8_t*)(combined.c_str()), combined.length(), 0);
+
+
       Serial.println(F("Packet queued"));
     } else {
       Serial.println(F("Nera duomenu"));
