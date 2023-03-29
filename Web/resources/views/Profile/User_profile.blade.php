@@ -11,7 +11,7 @@
                 <span class="text-success success-text p-2 fw-bold" hidden></span>
             </div>
             <div class="d-grid gap-3 p-2">
-                <div class="col-md-6">
+                <div class="col-md-8">
                     <table class="table table-borderless d-flex">
                         <tr>
                             <th>Vartotojo duomenys</th>
@@ -55,6 +55,19 @@
                 </div>
             </div>
             <div class="d-grid gap-3 p-2">@include('Profile.EditUserData')</div>
+            <div class="d-grid gap-0 p-2">
+                <p class="p-2"><b>Automobiliai</b><br /></p>
+                <div class="col-md-8" id="Cars">@include('Profile.Cars.ShowCars')</div>
+                <div class="collapse col-md-8 p-2" id="EditSelectedCar">
+                    @include('Profile.Cars.EditCar')
+                    <hr class="dropdown-divider" />
+                </div>
+                <p class="p-2">
+                    <a href="#AddCar" class="text-decoration-none link-secondary newCar" data-bs-toggle="collapse"><i class="fa-solid fa-user-plus"></i> Pridėti automobilio informaciją</a>
+                </p>
+                <div class="collapse col-md-8 p-2" id="AddCar">@include('Profile.Cars.AddCar')</div>
+                <hr class="dropdown-divider" />
+            </div>
             <div class="d-grid gap-3 p-2">
                 <p class="p-2">
                     <b>Paskyros trynimas</b><br />
@@ -96,6 +109,12 @@
             if ($("#EditData").hasClass("show")) {
                 $("#EditData").collapse("toggle");
             }
+            if ($("#AddCar").hasClass("show")) {
+                $("#AddCar").collapse("toggle");
+            }
+            if ($("#EditSelectedCar").hasClass("show")) {
+                $("#EditSelectedCar").collapse("toggle");
+            }
             $("span.danger-text").prop("hidden", true);
             var id = $(this).attr("data-id");
             $("#idd").val(id);
@@ -103,6 +122,43 @@
             $("span.success-text").prop("hidden", true);
             $(document).find("span.success-text").text("");
             $(document).find("span.danger-text").text("");
+        });
+    });
+</script>
+<script>
+    $(function () {
+        $("#form_delete_single").on("submit", function (e) {
+            e.preventDefault();
+            $.ajaxSetup({
+                headers: {
+                    "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content"),
+                },
+            });
+            $.ajax({
+                url: $(this).attr("action"),
+                method: $(this).attr("method"),
+                data: new FormData(this),
+                processData: false,
+                dataType: "json",
+                contentType: false,
+                success: function (data) {
+                    if (data.status == 0) {
+                        $("span.danger-text").prop("hidden", false);
+                        $(document).find("span.danger-text").text(data.error.idd);
+                    } else {
+                        $("span.danger-text").prop("hidden", true);
+                        $("#deleteCar").modal("hide");
+                        $(document).find("span.success-text").text("Automobilio informacija ištrintas!");
+                        $("span.success-text").prop("hidden", false);
+                        $.ajax({
+                            url: "{{route('ShowCarInfo')  }}",
+                            success: function (data) {
+                                $("#Car").html(data);
+                            },
+                        });
+                    }
+                },
+            });
         });
     });
 </script>

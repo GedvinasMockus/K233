@@ -39,6 +39,18 @@ Route::Get('/User_Profile', [UserController::class, 'DisplayUserProfile'])->name
 
 Route::post('/User_Profile/EditData', [UserController::class, 'Edit_user_data'])->name('Edit_user_data');
 
+Route::post('/User_Profile/AddCar', [UserController::class, 'Add_Car'])->name('Add_Car');
+
+Route::post('/User_Profile/EditCar', [UserController::class, 'Edit_Car'])->name('Edit_Car');
+
+Route::post('/User_Profile/DeleteCar', [UserController::class, 'Delete_Car'])->name('Delete_Car');
+
+Route::get('ShowCar', [UserController::class, 'ShowCarInfo'])->name('ShowCarInfo');
+
+Route::get('GetUserCarInfoSingle/{id}', [UserController::class, 'GetUserCarInfoSingle'])->name('GetUserCarInfoSingle');
+
+Route::get('GetUserCarInfoSingleSeparate/{id}', [UserController::class, 'GetUserCarInfoSingleSeparate'])->name('GetUserCarInfoSingleSeparate');
+
 Route::get('GetUserInfo', [UserController::class, 'GetUserInfo'])->name('GetUserInfo')->middleware('auth');
 
 Route::Get('/Profiles', [UserController::class, 'DisplayProfiles'])->name('DisplayProfiles');
@@ -68,16 +80,3 @@ Route::get('/Parking_Lot/{id}', [ReservationController::class, 'DisplayParkingLo
 Route::get('/Edit_Parking_Lot/{id}', [ReservationController::class, 'DisplayEditParkingLot']);
 
 Route::get('/Resertvation', [ReservationController::class, 'DisplayReservations'])->name('DisplayReservations');
-
-
-
-
-
-
-
-
-
-
-
-
-Route::Get('/Random', [Main::class, 'DisplayMain'])->name('Random')->middleware('auth');
