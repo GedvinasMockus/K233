@@ -136,8 +136,8 @@ class UserController extends Controller
 
     public function DisplayUserProfile()
     {
-
-        return view('Profile.User_profile');
+        $userController = new UserController();
+        return view('Profile.User_profile')->with(["cars" =>  $userController->GetUserCarInfo()]);
     }
 
     public function Edit_user_data(Request $request)
@@ -182,6 +182,146 @@ class UserController extends Controller
                 return response()->json(['status' => 1, 'data' => $data]);
             }
         }
+    }
+
+    public function Add_Car(Request $request)
+    {
+        $user = auth()->user();
+        $rules = [
+            'manufacturer' => 'required|alpha|min:2|max:20',
+            'model' => 'required|alpha_numbers_spaces_minus|min:3|max:20',
+            'year' => 'required|numeric|digits:4|min:1950|max:' . date('Y'),
+            'number' => 'required|alpha_num_dash'
+        ];
+        $customMessages = [
+            'required' => 'Laukelis turi būti užpildytas!',
+            'alpha' => 'Laukelyje gali būti tik raidės!',
+            'alpha_numbers_spaces_minus' => 'Laukelyje esanti informacija netinkama!',
+            'min' => 'Laukelyje esanti informacija per trumpa!',
+            'max' => 'Laukelyje esanti informacija per ilga!',
+            'year.min' => 'Laukelyje esantys metai yra senesni nei 1950!',
+            'year.max' => 'Laukelyje esantys metai yra jaunesni nei ' . date('Y') . '!',
+            'year.digits' => 'Laukelyje esantys metai netinkamo formato!',
+            'numeric' => 'Laukelyje esanti informacija gali būti tik skaičiai!',
+            'alpha_num_dash' => 'Laukelyje esantys valstybinis numeris yra netinkamo formato!',
+
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            $car = $request->manufacturer . ', ' . $request->model . ', ' . $request->year;
+            DB::insert('insert into car (fk_Userid, car_name, license_plate) values (?, ?, ?)', [$user->id, $car, $request->number]);
+            $userController = new UserController();
+            return response()->json(['status' => 1, 'car' => $userController->GetUserCarInfo()]);
+        }
+    }
+
+    public function Edit_Car(Request $request)
+    {
+        $user = auth()->user();
+        $rules = [
+            'id' => ['exists:car,id', function ($attribute, $value, $fail) use ($user, $request) {
+                if (sizeof(DB::table('car')->select(['car.*'])->where('fk_Userid', '=', $user->id)->where('id', '=', $request->id)->get()) == 0) {
+                    return $fail('Automobilis nerastas!');
+                }
+            }],
+            'manufacturer' => 'required|alpha|min:2|max:20',
+            'model' => 'required|alpha_numbers_spaces_minus|min:3|max:20',
+            'year' => 'required|numeric|digits:4|min:1950|max:' . date('Y'),
+            'number' => 'required|alpha_num_dash'
+        ];
+        $customMessages = [
+            'required' => 'Laukelis turi būti užpildytas!',
+            'alpha' => 'Laukelyje gali būti tik raidės!',
+            'alpha_numbers_spaces_minus' => 'Laukelyje esanti informacija netinkama!',
+            'min' => 'Laukelyje esanti informacija per trumpa!',
+            'max' => 'Laukelyje esanti informacija per ilga!',
+            'year.min' => 'Laukelyje esantys metai yra senesni nei 1950!',
+            'year.max' => 'Laukelyje esantys metai yra jaunesni nei ' . date('Y') . '!',
+            'year.digits' => 'Laukelyje esantys metai netinkamo formato!',
+            'numeric' => 'Laukelyje esanti informacija gali būti tik skaičiai!',
+            'alpha_num_dash' => 'Laukelyje esantys valstybinis numeris yra netinkamo formato!',
+            'exists' => 'Automobilis nerastas!'
+
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            $car = $request->manufacturer . ', ' . $request->model . ', ' . $request->year;
+            DB::update('update car set car_name=?, license_plate=? where id = ?', [$car, $request->number, $request->id]);
+            $userController = new UserController();
+            return response()->json(['status' => 1, 'car' => $userController->GetUserCarInfo()]);
+        }
+    }
+
+    public function Delete_Car(Request $request)
+    {
+        $user = auth()->user();
+        $rules = [
+            'idd' => ['exists:car,id', function ($attribute, $value, $fail) use ($user, $request) {
+                if (sizeof(DB::table('car')->select(['car.*'])->where('fk_Userid', '=', $user->id)->where('id', '=', $request->idd)->get()) == 0) {
+                    return $fail('Automobilis nerastas!');
+                }
+            }],
+        ];
+        $customMessages = [
+            'exists' => 'Automobilis nerastas!'
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            DB::delete('delete from car where id = ?', [$request->idd]);
+            $userController = new UserController();
+            return response()->json(['status' => 1, 'car' => $userController->GetUserCarInfo()]);
+        }
+    }
+
+    public function GetUserCarInfo()
+    {
+        $user = auth()->user();
+        $car = DB::table('car')
+            ->select(['id', 'car_name', 'license_plate'])
+            ->where('fk_Userid', '=', $user->id)->get();
+        return $car;
+    }
+
+    public function ShowCarInfo()
+    {
+        $userController = new UserController();
+        return view('Profile.Cars.ShowCars')->with(['cars' => $userController->GetUserCarInfo()])->render();
+    }
+
+    public function GetUserCarInfoSingle($id)
+    {
+        $user = auth()->user();
+        $data = DB::table('car')
+            ->select(['id', 'car_name', 'license_plate'])
+            ->where('fk_Userid', '=', $user->id)
+            ->where('id', '=', $id)
+            ->first();
+        return response()->json(["singleCar" => $data]);
+    }
+    public function GetUserCarInfoSingleSeparate($id)
+    {
+        $user = auth()->user();
+        $data = DB::table('car')
+            ->select(['id', 'car_name', 'license_plate'])
+            ->where('fk_Userid', '=', $user->id)
+            ->where('id', '=', $id)
+            ->first();
+        $parts = explode(', ', $data->car_name);
+        $make = $parts[0];
+        $model = $parts[1];
+        $year = $parts[2];
+        $dataObject = new \stdClass();
+        $dataObject->make = $make;
+        $dataObject->model = $model;
+        $dataObject->year = $year;
+        $dataObject->license_plate = $data->license_plate;
+        return response()->json(["singleCar" => $dataObject]);
     }
 
     public function GetUserInfo()
