@@ -51,16 +51,27 @@ client.on('message', function (topic, message) {
     const getDataFromTTN = JSON.parse(message);
     const rawData = getDataFromTTN.uplink_message.frm_payload;
     const decoded = base64decode(rawData);
-    const data = JSON.parse(decoded);
-
-    const applicationID =
-      getDataFromTTN.end_device_ids.application_ids.application_id;
-    const endDeviceID = getDataFromTTN.end_device_ids.device_id;
-    const topic = `v3/${applicationID}@ttn/devices/${endDeviceID}/down/push`;
-
-    if ('Working' in data) {
-      console.log(`Working: ${data.Working}`);
+    if (decoded.length < 30) {
+      const data = JSON.parse(decoded);
+      if ('Working' in data) {
+        console.log(`Working: ${data.Working}`);
+      }
     } else {
+      const applicationID =
+        getDataFromTTN.end_device_ids.application_ids.application_id;
+      const endDeviceID = getDataFromTTN.end_device_ids.device_id;
+      const topic = `v3/${applicationID}@ttn/devices/${endDeviceID}/down/push`;
+      var data = {};
+      const uuid = `${decoded.substr(0, 8)}-${decoded.substr(
+        8,
+        4
+      )}-${decoded.substr(12, 4)}-${decoded.substr(16, 4)}-${decoded.substr(
+        20,
+        12
+      )}`;
+      data.uuid = uuid;
+      data.distance = decoded.substr(32);
+      console.log(data);
       if (data.distance <= 100) {
         con.query(
           'SELECT * FROM user where uuid=?',
@@ -72,8 +83,6 @@ client.on('message', function (topic, message) {
             if (result && result.length) {
               console.log('Įleidžiama');
               console.table(data);
-
-              // Prepare the message to be sent back to TTN
               const messageToSend = {
                 downlinks: [
                   {
@@ -84,10 +93,7 @@ client.on('message', function (topic, message) {
                   },
                 ],
               };
-
-              // Convert messageToSend to a Buffer object
               const buffer = Buffer.from(JSON.stringify(messageToSend));
-
               client.publish(topic, buffer);
             } else {
               const messageToSend = {
@@ -100,8 +106,6 @@ client.on('message', function (topic, message) {
                   },
                 ],
               };
-
-              // Convert messageToSend to a Buffer object
               const buffer = Buffer.from(JSON.stringify(messageToSend));
 
               client.publish(topic, buffer);
@@ -120,8 +124,6 @@ client.on('message', function (topic, message) {
             },
           ],
         };
-
-        // Convert messageToSend to a Buffer object
         const buffer = Buffer.from(JSON.stringify(messageToSend));
 
         client.publish(topic, buffer);
