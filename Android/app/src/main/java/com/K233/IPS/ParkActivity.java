@@ -21,6 +21,11 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -30,9 +35,11 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.UUID;
 
 public class ParkActivity extends AppCompatActivity {
@@ -41,9 +48,18 @@ public class ParkActivity extends AppCompatActivity {
     private Button btn;
     private Boolean advertiserSingleton = true;
     private ImageButton btnLogout;
+    private TextView txtParkingSpot;
     private SharedPreferences savedData;
     private BluetoothLeAdvertiser advertiser;
     private AdvertiseCallback advCallback;
+
+
+    // to check if we are connected to Network
+    boolean isConnected = true;
+
+    // to check if we are monitoring Network
+    private boolean monitoringConnectivity = false;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +70,8 @@ public class ParkActivity extends AppCompatActivity {
             getSupportActionBar().hide();
         }
 
+        txtParkingSpot = findViewById(R.id.txtParkingSpot);
+        txtParkingSpot.setVisibility(View.INVISIBLE);
         btnLogout = findViewById(R.id.btnLogout);
         btn = findViewById(R.id.btnBarrier);
         savedData = getApplicationContext().getSharedPreferences("UserData", Context.MODE_PRIVATE);
@@ -131,6 +149,7 @@ public class ParkActivity extends AppCompatActivity {
 
     private void sendBeacon() {
         if (btAdapt.isEnabled()) {
+            checkForConnection();
             if (advertiserSingleton){
                 advertiserSingleton = false;
                 advertiser = btAdapt.getBluetoothLeAdvertiser();
@@ -181,6 +200,21 @@ public class ParkActivity extends AppCompatActivity {
             }).show();
         }
 
+    }
+
+    private void checkForConnection() {
+        txtParkingSpot.setVisibility(View.VISIBLE);
+        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        isConnected = activeNetworkInfo != null && activeNetworkInfo.isConnectedOrConnecting();
+        if (!isConnected) {
+            Toast.makeText(this, "No connection", Toast.LENGTH_SHORT).show();
+            connectivityManager.registerNetworkCallback(
+                    new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), connectivityCallback);
+            monitoringConnectivity = true;
+        } else {
+            getParkingSpot();
+        }
     }
 
     @Override
@@ -240,5 +274,33 @@ public class ParkActivity extends AppCompatActivity {
         }
         advertiserSingleton = true;
         advertiser.stopAdvertising(advCallback);
+    }
+
+    private ConnectivityManager.NetworkCallback connectivityCallback = new ConnectivityManager.NetworkCallback() {
+        @Override
+        public void onAvailable(Network network) {
+            isConnected = true;
+            Toast.makeText(ParkActivity.this, "Internet connected", Toast.LENGTH_SHORT).show();
+            getParkingSpot();
+
+        }
+
+        @Override
+        public void onLost(Network network) {
+            isConnected = false;
+            Toast.makeText(ParkActivity.this, "Internet lost", Toast.LENGTH_SHORT).show();
+        }
+    };
+
+    private void getParkingSpot(){
+        //TODO implement server ping
+        Random randomGenerator = new Random();
+        int randomInt = randomGenerator.nextInt(30);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                txtParkingSpot.setText("Parkavimo vietos numeris: " + randomInt);
+            }
+        });
     }
 }
