@@ -51,7 +51,7 @@ Route::get('GetUserCarInfoSingle/{id}', [UserController::class, 'GetUserCarInfoS
 
 Route::get('GetUserCarInfoSingleSeparate/{id}', [UserController::class, 'GetUserCarInfoSingleSeparate'])->name('GetUserCarInfoSingleSeparate');
 
-Route::get('GetUserInfo', [UserController::class, 'GetUserInfo'])->name('GetUserInfo')->middleware('auth')
+Route::get('GetUserInfo', [UserController::class, 'GetUserInfo'])->name('GetUserInfo')->middleware('auth');
 
 Route::Get('/Profiles', [UserController::class, 'DisplayProfiles'])->name('DisplayProfiles');
 
