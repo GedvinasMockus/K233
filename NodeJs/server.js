@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql');
 const bodyParser = require('body-parser');
@@ -5,38 +6,36 @@ const { base64encode, base64decode } = require('nodejs-base64');
 const mqtt = require('mqtt');
 const Buffer = require('buffer').Buffer;
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const con = mysql.createConnection({
-  host: 'localhost',
-  user: 'pvp_mysql',
-  password: 'K233LARAVEL',
-  database: 'pvp',
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
 });
 
-const mqttHost = 'eu1.cloud.thethings.network';
-const mqttUsername = 'parking-system-ktu@ttn';
-const mqttPassword =
-  'NNSXS.RU57MNKXUNSHCYRRXUYOMAWGJ5K7E3CIQNGKNMQ.7EK3MG3I5AGALHVBFBNJ662FFXX3VIK2OCSXNVCQYJAQY3ZIEXKA';
 const mqttClientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8);
 
 const mqttOptions = {
   port: 8883,
-  host: mqttHost,
+  host: process.env.MQTT_HOST,
   clientId: mqttClientId,
-  username: mqttUsername,
-  password: mqttPassword,
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD,
   keepalive: 60,
   reconnectPeriod: 1000,
   protocol: 'mqtts',
 };
 
+var topicDown;
 const client = mqtt.connect(mqttOptions);
 
-// MQTT setup
 client.on('connect', function () {
   console.log('Client connected to TTN');
   client.subscribe('#');
@@ -45,6 +44,38 @@ client.on('connect', function () {
 client.on('error', function (err) {
   console.log(err);
 });
+
+function processTTNData(getDataFromTTN, decoded) {
+  const applicationID =
+    getDataFromTTN.end_device_ids.application_ids.application_id;
+  const endDeviceID = getDataFromTTN.end_device_ids.device_id;
+  topicDown = `v3/${applicationID}@ttn/devices/${endDeviceID}/down/push`;
+  var data = {};
+  const uuid = `${decoded.substr(0, 8)}-${decoded.substr(
+    8,
+    4
+  )}-${decoded.substr(12, 4)}-${decoded.substr(16, 4)}-${decoded.substr(
+    20,
+    12
+  )}`;
+  data.uuid = uuid;
+  data.distance = decoded.substr(32);
+  data.parking = getDataFromTTN.uplink_message.f_port;
+  return data;
+}
+
+function createMessageToSend(payload, getDataFromTTN) {
+  const messageToSend = {
+    downlinks: [
+      {
+        f_port: getDataFromTTN.uplink_message.f_port,
+        frm_payload: Buffer.from(JSON.stringify(payload)).toString('base64'),
+      },
+    ],
+  };
+  const buffer = Buffer.from(JSON.stringify(messageToSend));
+  client.publish(topicDown, buffer);
+}
 
 client.on('message', function (topic, message) {
   try {
@@ -57,22 +88,9 @@ client.on('message', function (topic, message) {
         console.log(`Working: ${data.Working}`);
       }
     } else {
-      const applicationID =
-        getDataFromTTN.end_device_ids.application_ids.application_id;
-      const endDeviceID = getDataFromTTN.end_device_ids.device_id;
-      const topic = `v3/${applicationID}@ttn/devices/${endDeviceID}/down/push`;
-      var data = {};
-      const uuid = `${decoded.substr(0, 8)}-${decoded.substr(
-        8,
-        4
-      )}-${decoded.substr(12, 4)}-${decoded.substr(16, 4)}-${decoded.substr(
-        20,
-        12
-      )}`;
-      data.uuid = uuid;
-      data.distance = decoded.substr(32);
+      var data = processTTNData(getDataFromTTN, decoded);
       console.log(data);
-      if (data.distance <= 100) {
+      if (data.distance <= 500) {
         con.query(
           'SELECT * FROM user where uuid=?',
           [data.uuid],
@@ -81,59 +99,93 @@ client.on('message', function (topic, message) {
               console.log('[MySQL ERROR]', err);
             });
             if (result && result.length) {
-              console.log('Įleidžiama');
+              var parkingId = 1;
+              con.query(
+                'SELECT `reservation`.`id`, `reservation`.`date_from`, `reservation`.`date_until`, `reservation`.`is_inside`, `parking_space`.`fk_Parking_lotid`, `parking_space`.`space_number`' +
+                  'FROM `reservation` LEFT JOIN `parking_space` ON `reservation`.`fk_Parking_spaceid`=`parking_space`.`id`' +
+                  'WHERE `fk_Userid`=? AND `fk_Parking_lotid`=? AND CURRENT_TIMESTAMP()>=`date_from` AND CURRENT_TIMESTAMP()<=`date_until` LIMIT 1',
+                [result[0].id, data.parking],
+                function (err, DBresult, fields) {
+                  if (err) {
+                    console.log('[MySQL ERROR]', err);
+                  } else {
+                    if (DBresult.length == 1 && DBresult[0].is_inside == 0) {
+                      createMessageToSend({ status: 'open' }, getDataFromTTN);
+                      console.log('Įleidžiama');
+                      writeReservation(DBresult[0].id);
+                      console.table(DBresult);
+                    } else {
+                      createMessageToSend({ status: 'closed' }, getDataFromTTN);
+                      console.log('Rezervacija nerasta');
+                    }
+                  }
+                }
+              );
               console.table(data);
-              const messageToSend = {
-                downlinks: [
-                  {
-                    f_port: getDataFromTTN.uplink_message.f_port,
-                    frm_payload: Buffer.from(
-                      JSON.stringify({ status: 'open' })
-                    ).toString('base64'),
-                  },
-                ],
-              };
-              const buffer = Buffer.from(JSON.stringify(messageToSend));
-              client.publish(topic, buffer);
             } else {
-              const messageToSend = {
-                downlinks: [
-                  {
-                    f_port: getDataFromTTN.uplink_message.f_port,
-                    frm_payload: Buffer.from(
-                      JSON.stringify({ status: 'error' })
-                    ).toString('base64'),
-                  },
-                ],
-              };
-              const buffer = Buffer.from(JSON.stringify(messageToSend));
-
-              client.publish(topic, buffer);
-              console.log('UUID nerastas!');
+              createMessageToSend({ status: 'error' }, getDataFromTTN);
             }
           }
         );
       } else {
-        const messageToSend = {
-          downlinks: [
-            {
-              f_port: getDataFromTTN.uplink_message.f_port,
-              frm_payload: Buffer.from(
-                JSON.stringify({ status: 'closed' })
-              ).toString('base64'),
-            },
-          ],
-        };
-        const buffer = Buffer.from(JSON.stringify(messageToSend));
-
-        client.publish(topic, buffer);
+        createMessageToSend({ status: 'closed' }, getDataFromTTN);
         console.log('Atstumas perdidelis');
       }
     }
-  } catch (err) {
-    console.log('Nėra info');
-  }
+  } catch (err) {}
 });
+
+function writeReservation(id) {
+  const md5Hash = crypto.createHash('md5').update(id.toString()).digest('hex');
+  fs.writeFile(
+    'insideParking/' + md5Hash,
+    `${id},${new Date().getTime()}`,
+    (err) => {
+      if (err) {
+        console.log('Klaida kuriant rezervacijos failą:', err);
+      }
+    }
+  );
+}
+
+function checkReservation() {
+  fs.readdir('insideParking', (err, files) => {
+    if (err) {
+      console.log('Klaida skaitant rezervacijų aplankalą:', err);
+      return;
+    }
+    files.forEach((file) => {
+      fs.readFile('insideParking/' + file, 'utf8', (err, data) => {
+        if (err) {
+          console.log('Klaida skaitant rezervacijos failą:', err);
+          return;
+        }
+        const [id, timeAdded] = data.split(',');
+        const currentTime = new Date().getTime();
+        if (currentTime - parseInt(timeAdded) >= 60 * 1000) {
+          fs.unlink('insideParking/' + file, (err) => {
+            if (err) {
+              console.log('Klaida trinant failą:', err);
+            }
+          });
+          con.query(
+            'UPDATE `reservation` SET `is_inside` = 1 WHERE `id` = ?',
+            [id],
+            (err, result) => {
+              if (err) {
+                console.log('[MySQL ERROR]', err);
+              } else {
+                console.log(`Rezervacija id ${id} atnaujinta.`);
+              }
+            }
+          );
+        }
+      });
+    });
+  });
+}
+
+setInterval(checkReservation, 10000);
 
 app.post('/login/', (req, resData, next) => {
   var post_data = req.body;
