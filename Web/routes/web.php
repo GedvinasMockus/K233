@@ -71,12 +71,29 @@ Route::Get('/Balance', [UserController::class, 'DisplayBalance'])->name('Display
 
 
 
+
 // Reservation routes
 
 Route::get('/Parking_Lots', [ReservationController::class, 'DisplayParkingLots'])->name('DisplayParkingLots');
+
+Route::get('/Parking_Lot/Add', [ReservationController::class, 'DisplayNewParkingLot'])->name('DisplayNewParkingLot');
 
 Route::get('/Parking_Lot/{id}', [ReservationController::class, 'DisplayParkingLot']);
 
 Route::get('/Edit_Parking_Lot/{id}', [ReservationController::class, 'DisplayEditParkingLot']);
 
 Route::get('/Resertvation', [ReservationController::class, 'DisplayReservations'])->name('DisplayReservations');
+
+// Route::post('/Parking_Lot_AddLots', [ReservationController::class, 'SaveLots'])->name('SaveLots');
+
+Route::post('/savelots', [ReservationController::class, 'SaveLots'])->name('SaveLots');
+
+
+
+
+
+
+
+
+
+Route::Get('/Random', [Main::class, 'DisplayMain'])->name('Random')->middleware('auth');
