@@ -6,7 +6,7 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-12 text-center">
-                        <a href="{{ route('Random') }}" class="btn btn-primary">Pridėti parkavimo aikštelę</a>
+                        <a href="{{ route('DisplayNewParkingLot') }}" class="btn btn-primary">Pridėti parkavimo aikštelę</a>
                     </div>
                 </div>
                 <div class="d-grid p-2">
@@ -17,11 +17,11 @@
                             <th></th>
                         </tr>
                         @foreach($lots as $lot)
-                            <tr data-href="/Parking_Lot/{{$lot->id}}">
-                                <td>{{$lot->parking_name}}</td>
-                                <td>{{$lot->city}} {{$lot->street}} {{$lot->street_number}}</td>
-                                <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
-                            </tr>
+                        <tr data-href="/Parking_Lot/{{$lot->id}}">
+                            <td>{{$lot->parking_name}}</td>
+                            <td>{{$lot->city}} {{$lot->street}} {{$lot->street_number}}</td>
+                            <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
+                        </tr>
                         @endforeach
                     </table>
                 </div>

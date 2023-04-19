@@ -7,6 +7,7 @@
         <title>Išmanioji parkavimo sistema</title>
         <link rel="icon" href="{{ URL::asset('css/favicon.ico') }}" type="image/x-icon" />
         <meta name="csrf-token" content="{{ csrf_token() }}" />
+        <link type="text/css" rel="stylesheet" href="{{ url('css/css.css') }}" />
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-uWxY/CJNBR+1zjPWmfnSnVxwRheevXITnMqoEIeG1LJrdI0GlVs/9cVSyPYXdcSF" crossorigin="anonymous" />
         <script src="https://kit.fontawesome.com/e9c05e7fa6.js" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-kQtW33rZJAHjgefvhyyzcGF3C5TFyBQBA13V1RKPf4uH+bwyzQxZ6CmMZHmNBEfJ" crossorigin="anonymous"></script>
@@ -14,6 +15,7 @@
         <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="http://code.jquery.com/jquery-latest.min.js"></script>
         <!-- <link rel="stylesheet" href="/css/app.css" /> -->
     </head>
     <body>

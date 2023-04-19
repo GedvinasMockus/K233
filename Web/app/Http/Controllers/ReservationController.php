@@ -42,7 +42,7 @@ class ReservationController extends Controller
         Log::info($request);
         $newspaces = $request->input('points');
         // Log::info($newlots);
-        
+
         $lot = DB::table('parking_lot')->insertGetId([
             'parking_name' => $request->input('name'),
             'photo_path' => $request->input('path'),
@@ -55,14 +55,12 @@ class ReservationController extends Controller
         Log::info($lot);
 
         $lotNr = 0;
-        foreach($newspaces as $space)
-        {
+        foreach ($newspaces as $space) {
             $arrayNr = 0;
             $points = explode(" ", $space);
             $allpoints = array();
             // Log::info($points);
-            foreach($points as $point)
-            {
+            foreach ($points as $point) {
                 $point = explode(",", $point);
                 $allpoints[$arrayNr] = $point;
                 // array_push($allpoints, $point);
@@ -88,6 +86,6 @@ class ReservationController extends Controller
 
 
 
-        return response()->json(['success'=>'Got Simple Ajax Request.']);
+        return response()->json(['success' => 'Got Simple Ajax Request.']);
     }
 }
