@@ -131,12 +131,14 @@
 
             var clientRect = elem.getBoundingClientRect();
 
-            let offsLeft = clientRect.left + document.body.scrollLeft;
-            let offsTop = clientRect.top + document.body.scrollTop;
+            console.log(document.documentElement.scrollTop);
+
+            let offsLeft = clientRect.left + document.documentElement.scrollLeft;
+            let offsTop = clientRect.top + document.documentElement.scrollTop;
 
             let pts = polyline.getAttribute("points") || "";
             const newPoint = `${e.pageX - offsLeft},${e.pageY - offsTop} `;
-            console.log(newPoint);
+            // console.log(newPoint);
 
             pts += newPoint;
             polyline.setAttribute("points", pts);
@@ -153,8 +155,8 @@
         svg.addEventListener("mousemove", (e) => {
             if (!(lastPt === undefined) && clicks > 0 && create) {
                 var clientRect = elem.getBoundingClientRect();
-                let offsLeft = clientRect.left + document.body.scrollLeft;
-                let offsTop = clientRect.top + document.body.scrollTop;
+                let offsLeft = clientRect.left + document.documentElement.scrollLeft;
+                let offsTop = clientRect.top + document.documentElement.scrollTop;
 
                 templine.setAttribute("x1", lastPt[0]);
                 templine.setAttribute("y1", lastPt[1]);
