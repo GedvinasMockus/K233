@@ -99,7 +99,6 @@ client.on('message', function (topic, message) {
               console.log('[MySQL ERROR]', err);
             });
             if (result && result.length) {
-              var parkingId = 1;
               con.query(
                 'SELECT `reservation`.`id`, `reservation`.`date_from`, `reservation`.`date_until`, `reservation`.`is_inside`, `parking_space`.`fk_Parking_lotid`, `parking_space`.`space_number`' +
                   'FROM `reservation` LEFT JOIN `parking_space` ON `reservation`.`fk_Parking_spaceid`=`parking_space`.`id`' +
@@ -110,12 +109,15 @@ client.on('message', function (topic, message) {
                     console.log('[MySQL ERROR]', err);
                   } else {
                     if (DBresult.length == 1 && DBresult[0].is_inside == 0) {
-                      createMessageToSend({ status: 'open' }, getDataFromTTN);
+                      createMessageToSend(
+                        { status: '1', nr: DBresult[0].space_number },
+                        getDataFromTTN
+                      );
                       console.log('Įleidžiama');
                       writeReservation(DBresult[0].id);
                       console.table(DBresult);
                     } else {
-                      createMessageToSend({ status: 'closed' }, getDataFromTTN);
+                      createMessageToSend({ status: '0' }, getDataFromTTN);
                       console.log('Rezervacija nerasta');
                     }
                   }
@@ -123,7 +125,7 @@ client.on('message', function (topic, message) {
               );
               console.table(data);
             } else {
-              createMessageToSend({ status: 'error' }, getDataFromTTN);
+              createMessageToSend({ status: '2' }, getDataFromTTN);
             }
           }
         );
@@ -193,7 +195,7 @@ app.post('/login/', (req, resData, next) => {
   var email = post_data.email;
 
   con.query(
-    'SELECT * FROM user where email=?',
+    'SELECT id, uuid, email, password FROM user where email=?',
     [email],
     function (err, result, fields) {
       con.on('error', function (err) {
@@ -204,6 +206,7 @@ app.post('/login/', (req, resData, next) => {
         var hash = encrypt.replace(/^\$2y(.+)$/i, '$2a$1');
         bcrypt.compare(user_password, hash, function (err, res) {
           if (res == true) {
+            delete result[0].password;
             resData.end(JSON.stringify([result[0]]));
           } else {
             resData.end(JSON.stringify('Slaptažodis neteisingas!'));
@@ -211,6 +214,53 @@ app.post('/login/', (req, resData, next) => {
         });
       } else {
         resData.json('Vartotojas nerastas!');
+      }
+    }
+  );
+});
+
+app.post('/openBarrier/', (req, resData, next) => {
+  var post_data = req.body;
+  var uuid = post_data.uuid;
+  var email = post_data.email;
+  con.query(
+    'SELECT id FROM user where uuid=? and email=?',
+    [uuid, email],
+    function (err, result, fields) {
+      con.on('error', function (err) {
+        console.log('[MySQL ERROR]', err);
+      });
+      if (result && result.length) {
+        con.query(
+          'SELECT `reservation`.`date_from`, `reservation`.`date_until`, `reservation`.`is_inside`, `parking_space`.`space_number`, `parking_lot`.`parking_name`, `parking_lot`.`photo_path`,' +
+            '`parking_space`.`x1`, `parking_space`.`y1`, `parking_space`.`x2`, `parking_space`.`y2`, `parking_space`.`x3`, `parking_space`.`y3`, `parking_space`.`x4`, `parking_space`.`y4`' +
+            'FROM `reservation` LEFT JOIN `parking_space` ON `reservation`.`fk_Parking_spaceid`=`parking_space`.`id`' +
+            'LEFT JOIN `parking_lot` ON `parking_space`.`fk_Parking_lotid`=`parking_lot`.`id`' +
+            'WHERE `fk_Userid`=? AND CURRENT_TIMESTAMP()>=`date_from` AND CURRENT_TIMESTAMP()<=`date_until` LIMIT 1',
+          [result[0].id],
+          function (err, DBresult, fields) {
+            if (err) {
+              console.log('[MySQL ERROR]', err);
+            } else {
+              if (DBresult.length == 1) {
+                const coordinates = [];
+                for (let i = 1; i <= 4; i++) {
+                  const x = DBresult[0][`x${i}`];
+                  const y = DBresult[0][`y${i}`];
+                  delete DBresult[0][`x${i}`];
+                  delete DBresult[0][`y${i}`];
+                  coordinates.push(`${x},${y}`);
+                }
+                DBresult[0].coordinates = coordinates;
+                resData.json(DBresult);
+              } else {
+                resData.json('Rezervacija nerasta');
+              }
+            }
+          }
+        );
+      } else {
+        resData.json('Vartotojo informacija nerasta!');
       }
     }
   );
