@@ -164,7 +164,7 @@ function checkReservation() {
         }
         const [id, timeAdded] = data.split(',');
         const currentTime = new Date().getTime();
-        if (currentTime - parseInt(timeAdded) >= 60 * 1000) {
+        if (currentTime - parseInt(timeAdded) >= 90 * 1000) {
           fs.unlink('insideParking/' + file, (err) => {
             if (err) {
               console.log('Klaida trinant failą:', err);
