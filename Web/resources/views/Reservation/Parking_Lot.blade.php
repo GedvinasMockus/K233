@@ -41,10 +41,10 @@
 
         let pts = `${space['x1']},${space['y1']} ${space['x2']},${space['y2']} ${space['x3']},${space['y3']} ${space['x4']},${space['y4']} `;
 
-        var polyLine = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        var polyLine = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
         polyLine.setAttribute("onclick", "onClick(this);");
         polyLine.setAttribute("class", "poly");
-        polyLine.setAttribute("id", "polyline" + space['id']);
+        polyLine.setAttribute("id", "polygon" + space['id']);
         polyLine.setAttribute("points", pts);
         polyLine.setAttribute("href", "/Parking_Space/" + space['id']);
         $("#svg").append(polyLine);
