@@ -35,8 +35,11 @@
             <div class="card-body">
                 <h1 id="test">Test</h1>
                 <button onclick="onSave(this)" id="c">Išsaugoti vietas</button>
-                <button onclick="onKeypress(this)" id="b">create mode (spacebar): false</button>
+                <button onclick="onKeypress(this)" id="b">create mode (A): false</button>
                 <div class="containerofmap" id="image"></div>
+                {{-- <div>
+                    <img class="containerofmap" id="image">
+                </div> --}}
             </div>
         </div>
     </div>
@@ -52,6 +55,9 @@
     var toggle = false;
     var points = [[], [], [], []];
     var allPoints = [];
+    var img = new Image();
+    var height = 0;
+    var width = 0;
 
     document.addEventListener("click", onClickListener);
     document.addEventListener("keypress", onKeypress);
@@ -62,16 +68,20 @@
     });
 
     function onKeypress(e) {
-        if (e.key == " " || e.code == "Space" || e.keyCode == 32 || e.tagName == "BUTTON") {
+        if (e.key == "a" || e.tagName == "BUTTON") {
             create = !create;
-            document.getElementById("b").innerHTML = "create mode (spacebar): " + create;
+            document.getElementById("b").innerHTML = "create mode (A): " + create;
         }
     }
 
     function loadMap() {
         var path = document.getElementById("mapPath").value;
+        img.src = path;
+        height = img.height;
+        width = img.width;
 
-        document.getElementById("image").setAttribute("style", "background: url(" + path + ") no-repeat");
+        document.getElementById("image").setAttribute("style", "background: url(" + path + ") no-repeat; height: " + height + "px; width:" + width + "px;");
+        document.getElementById("svg").setAttribute("style", "height: " + height + "px; width:" + width + "px;");
     }
 
     function onSave() {
@@ -131,20 +141,19 @@
 
             var clientRect = elem.getBoundingClientRect();
 
-            console.log(document.documentElement.scrollTop);
-
             let offsLeft = clientRect.left + document.documentElement.scrollLeft;
             let offsTop = clientRect.top + document.documentElement.scrollTop;
 
             let pts = polyline.getAttribute("points") || "";
             const newPoint = `${e.pageX - offsLeft},${e.pageY - offsTop} `;
-            // console.log(newPoint);
+            console.log(newPoint);
 
             pts += newPoint;
             polyline.setAttribute("points", pts);
             lastPt = [e.pageX - offsLeft, e.pageY - offsTop];
 
             if (clicks == 3) {
+                console.log(pts);
                 allPoints.push(pts);
                 $("#svg").unbind();
                 console.log("Removed onClick event");

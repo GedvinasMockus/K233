@@ -18,7 +18,23 @@ class ReservationController extends Controller
 
     public function DisplayParkingLot($id)
     {
-        return view('Reservation.Parking_Lot', ['id' => $id]);
+        $spaces = DB::table('parking_space')->where('fk_Parking_lotid', $id)->get();
+        $photo = DB::table('parking_lot')->select('photo_path')->where('id', $id)->first()->photo_path;
+
+        // dd($photo);
+        // dd($spaces);
+
+        return view('Reservation.Parking_Lot', compact('id', 'spaces', 'photo'));
+    }
+
+    public function DisplayParkingSpace($id)
+    {
+        $lot = DB::table('parking_space')
+            ->join('parking_lot', 'parking_space.fk_Parking_lotid', '=', 'parking_lot.id')->select('parking_lot.*')->first();
+
+        $space = DB::table('parking_space')->where('id', $id)->first();
+
+        return view('Reservation.Parking_Space', compact('id', 'lot', 'space'));
     }
 
     public function DisplayReservations()

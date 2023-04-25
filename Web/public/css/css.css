@@ -1,17 +1,13 @@
 .containerofmap {
     position: relative;
-    height: 540px;
-    width: 1080px;
-    /* background: url(
-        https://www.wikihow.com/images/thumb/9/96/Use-Parking-Lot-Etiquette-Step-16.jpg/v4-460px-Use-Parking-Lot-Etiquette-Step-16.jpg.webp
-        ) no-repeat; */
-    /* background: url(https://i.ibb.co/tB6jcgH/lot1.png) no-repeat; */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    height: 445px;
 }
 
 .hover {
     position: absolute;
-    height: 540px;
-    width: 1080px;
 }
 
 .hover:hover {
@@ -28,6 +24,12 @@
 }
 
 polyline {
+    fill: rgba(106, 247, 106);
+    stroke: rgb(0, 0, 0);
+    stroke-width: 1;
+}
+
+polygon {
     fill: rgba(106, 247, 106);
     stroke: rgb(106, 247, 106);
     stroke-width: 1;
