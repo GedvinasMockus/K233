@@ -80,6 +80,8 @@ Route::get('/Parking_Lot/Add', [ReservationController::class, 'DisplayNewParking
 
 Route::get('/Parking_Lot/{id}', [ReservationController::class, 'DisplayParkingLot']);
 
+Route::get('/Parking_Space/{id}', [ReservationController::class, 'DisplayParkingSpace']);
+
 Route::get('/Edit_Parking_Lot/{id}', [ReservationController::class, 'DisplayEditParkingLot']);
 
 Route::get('/Resertvation', [ReservationController::class, 'DisplayReservations'])->name('DisplayReservations');
