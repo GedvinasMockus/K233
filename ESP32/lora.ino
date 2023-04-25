@@ -21,6 +21,9 @@ const int servoPinA1 = 17;
 const int servoPinA2 = 16;
 const int servoPinB1 = 4;
 const int servoPinB2 = 15;
+const int parkingNum = 1;
+
+const int relay = 23;
 
 dr_t drSF = DR_SF7;
 
@@ -60,7 +63,7 @@ int calculateDistance(int txPower, int rssi) {
   return roundedDistance;
 }
 
-const unsigned TX_INTERVAL = 3;
+const unsigned TX_INTERVAL = 1;
 static osjob_t sendjob;
 
 const lmic_pinmap lmic_pins = {
@@ -149,7 +152,7 @@ void do_send(osjob_t* j) {
       digitalWrite(ledPin1, LOW);
       digitalWrite(ledPin2, HIGH);
       digitalWrite(ledPin3, LOW);
-      LMIC_setTxData2(1, (uint8_t*)(combined.c_str()), combined.length(), 0);
+      LMIC_setTxData2(parkingNum, (uint8_t*)(combined.c_str()), combined.length(), 0);
 
 
       Serial.println(F("Packet queued"));
@@ -219,6 +222,7 @@ void onEvent(ev_t ev) {
   Serial.print(os_getTime());
   Serial.print(": ");
   String status;
+  String space;
   switch (ev) {
     case EV_JOINING:
       LMIC_setDrTxpow(drSF, 14);
@@ -262,7 +266,6 @@ void onEvent(ev_t ev) {
       break;
     case EV_TXCOMPLETE:
       joined = true;
-      founded = false;
       memset(beaconList, 0, sizeof(beaconList));
       beaconCount = 0;
       Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
@@ -272,7 +275,10 @@ void onEvent(ev_t ev) {
         status = json["status"].as<String>();
         Serial.print("Received status: ");
         Serial.println(status);
-        if (strcasecmp(status.c_str(), "open") == 0) {
+        if (strcasecmp(status.c_str(), "1") == 0) {
+          space = json["nr"].as<String>();
+          Serial.println(space);
+
           digitalWrite(ledPin1, HIGH);
           digitalWrite(ledPin2, LOW);
           digitalWrite(ledPin3, LOW);
@@ -282,11 +288,13 @@ void onEvent(ev_t ev) {
           digitalWrite(ledPin2, LOW);
           digitalWrite(ledPin3, HIGH);
         }
+        status = "";
       } else {
         digitalWrite(ledPin1, LOW);
         digitalWrite(ledPin2, LOW);
         digitalWrite(ledPin3, HIGH);
       }
+      founded = false;
       os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
       break;
     case EV_TXSTART:
@@ -308,8 +316,10 @@ void onEvent(ev_t ev) {
 }
 
 void servoWork() {
+  digitalWrite(relay, HIGH);
   opening(14);
   delay(4000);
+  digitalWrite(relay, LOW);
   closing(14);
 }
 
@@ -327,6 +337,8 @@ void setup() {
   digitalWrite(ledPin1, LOW);
   digitalWrite(ledPin2, LOW);
   digitalWrite(ledPin3, LOW);
+  pinMode(relay, OUTPUT);
+  digitalWrite(relay, LOW);
   pinMode(servoPinA1, OUTPUT);
   pinMode(servoPinA2, OUTPUT);
   pinMode(servoPinB1, OUTPUT);
