@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:backgroundTint="#806161"
     tools:context=".MainActivity">
 
     <TextView
@@ -93,8 +94,8 @@
         android:layout_marginTop="16dp"
         android:backgroundTint="@color/grey"
         android:fontFamily="@font/armata"
-        android:textColor="@color/white"
         android:text="Prisijungti"
+        android:textColor="@color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/edtPass" />

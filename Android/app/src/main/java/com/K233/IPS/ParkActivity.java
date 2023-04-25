@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.gridlayout.widget.GridLayout;
 
 import android.Manifest;
 import android.app.Activity;
@@ -21,6 +22,13 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Rect;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -31,13 +39,25 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.BoringLayout;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
@@ -48,18 +68,13 @@ public class ParkActivity extends AppCompatActivity {
     private Button btn;
     private Boolean advertiserSingleton = true;
     private ImageButton btnLogout;
+    private ImageView imgLot;
     private TextView txtParkingSpot;
     private SharedPreferences savedData;
     private BluetoothLeAdvertiser advertiser;
     private AdvertiseCallback advCallback;
-
-
-    // to check if we are connected to Network
     boolean isConnected = true;
-
-    // to check if we are monitoring Network
-    private boolean monitoringConnectivity = false;
-
+    private String POSTresponse = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +87,7 @@ public class ParkActivity extends AppCompatActivity {
 
         txtParkingSpot = findViewById(R.id.txtParkingSpot);
         txtParkingSpot.setVisibility(View.INVISIBLE);
+        imgLot = findViewById(R.id.imgLot);
         btnLogout = findViewById(R.id.btnLogout);
         btn = findViewById(R.id.btnBarrier);
         savedData = getApplicationContext().getSharedPreferences("UserData", Context.MODE_PRIVATE);
@@ -114,6 +130,7 @@ public class ParkActivity extends AppCompatActivity {
         });
     }
 
+
     private static byte[] getPayload(String uuid, int major, int minor) {
         byte[] prefixArray = getBytesFromShort((short) 533);
         byte[] uuidArray = getBytesFromUUID(uuid);
@@ -149,7 +166,13 @@ public class ParkActivity extends AppCompatActivity {
 
     private void sendBeacon() {
         if (btAdapt.isEnabled()) {
-            checkForConnection();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    checkForConnection();
+                }
+            }).start();
+
             if (advertiserSingleton){
                 advertiserSingleton = false;
                 advertiser = btAdapt.getBluetoothLeAdvertiser();
@@ -190,7 +213,6 @@ public class ParkActivity extends AppCompatActivity {
                 }, 15000);
             }
         } else {
-            Log.e("alert", "alert");
             AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
             alertBuilder.setTitle("\"Bluetooth\" neįjungtas").setMessage("Norint atidaryti barjerą, reikia įjungti \"Bluetooth\" telefone!").setPositiveButton("Supratau", new DialogInterface.OnClickListener() {
                 @Override
@@ -203,15 +225,17 @@ public class ParkActivity extends AppCompatActivity {
     }
 
     private void checkForConnection() {
-        txtParkingSpot.setVisibility(View.VISIBLE);
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         isConnected = activeNetworkInfo != null && activeNetworkInfo.isConnectedOrConnecting();
         if (!isConnected) {
-            Toast.makeText(this, "No connection", Toast.LENGTH_SHORT).show();
-            connectivityManager.registerNetworkCallback(
-                    new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), connectivityCallback);
-            monitoringConnectivity = true;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    txtParkingSpot.setVisibility(View.VISIBLE);
+                    Toast.makeText(getApplicationContext(), "No connection", Toast.LENGTH_SHORT).show();
+                }
+            });
         } else {
             getParkingSpot();
         }
@@ -276,31 +300,154 @@ public class ParkActivity extends AppCompatActivity {
         advertiser.stopAdvertising(advCallback);
     }
 
-    private ConnectivityManager.NetworkCallback connectivityCallback = new ConnectivityManager.NetworkCallback() {
-        @Override
-        public void onAvailable(Network network) {
-            isConnected = true;
-            Toast.makeText(ParkActivity.this, "Internet connected", Toast.LENGTH_SHORT).show();
-            getParkingSpot();
-
-        }
-
-        @Override
-        public void onLost(Network network) {
-            isConnected = false;
-            Toast.makeText(ParkActivity.this, "Internet lost", Toast.LENGTH_SHORT).show();
-        }
-    };
-
     private void getParkingSpot(){
-        //TODO implement server ping
-        Random randomGenerator = new Random();
-        int randomInt = randomGenerator.nextInt(30);
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                txtParkingSpot.setText("Parkavimo vietos numeris: " + randomInt);
+        try {
+            URL url = new URL("http://78.62.39.220:3000/openBarrier");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setDoOutput(true);
+
+            JSONObject json = new JSONObject();
+            json.put("uuid", savedData.getString("UUID","ffffffff-ffff-ffff-ffff-ffffffffffff" ));
+            json.put("email", savedData.getString("email", "empty@empty.com"));
+
+            OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream());
+            writer.write(json.toString());
+            writer.flush();
+
+            int statusCode = connection.getResponseCode();
+            if (statusCode == HttpURLConnection.HTTP_OK) {
+                StringBuffer response = new StringBuffer();
+                InputStream inputStream = connection.getInputStream();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+                inputStream.close();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        POSTresponse = String.valueOf(response);
+                        showParkingSpot();
+                    }
+                });
+
+            } else {
+                // Handle the error
             }
-        });
+        } catch (Exception e) {
+            // Handle the exception
+            e.printStackTrace();
+        }
     }
+    private void showParkingSpot() {
+        txtParkingSpot.setVisibility(View.VISIBLE);
+        if (POSTresponse.equals("\"Vartotojo informacija nerasta!\"") || POSTresponse.equals("\"Rezervacija nerasta\"")) {
+            txtParkingSpot.setText(POSTresponse);
+        } else {
+            try {
+                String[] coords = new String[4];
+                JSONArray jsonArr = new JSONArray(POSTresponse);
+                JSONObject json = jsonArr.getJSONObject(0);
+                String parkSpace = json.getString("space_number");
+                String parkLot = json.getString("parking_name");
+                String pic = json.getString("photo_path");
+                JSONArray coordinates = json.getJSONArray("coordinates");
+                for (int i = 0; i < 4; i++) {
+                    String coordinate = coordinates.getString(i);
+                    coords[i] = coordinate;
+                }
+                String txtToShow = parkSpace + " vieta aikštelėje \"" + parkLot + "\"";
+                txtParkingSpot.setText(txtToShow);
+                Thread lotDisplay = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            URL url = new URL(pic);
+                            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                            connection.setDoInput(true);
+                            connection.connect();
+                            InputStream input = connection.getInputStream();
+                            Bitmap bitmap = BitmapFactory.decodeStream(input);
+
+                            Bitmap newBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+                            Canvas canvas = new Canvas(newBitmap);
+                            canvas.drawBitmap(bitmap, 0, 0, null);
+
+                            Paint paint = new Paint();
+                            paint.setColor(Color.BLACK);
+                            paint.setStyle(Paint.Style.STROKE);
+                            paint.setStrokeWidth(1);
+                            Path path = new Path();
+                            path.moveTo(Float.parseFloat(coords[0].split(",")[0]), Float.parseFloat(coords[0].split(",")[1]));
+                            for (int i = 1; i < 4; i++) {
+                                path.lineTo(Float.parseFloat(coords[i].split(",")[0]), Float.parseFloat(coords[i].split(",")[1]));
+                            }
+                            path.close();
+
+                            paint.setStyle(Paint.Style.FILL);
+                            paint.setColor(Color.parseColor("#8000FF00"));
+                            canvas.drawPath(path, paint);
+
+                            paint.setColor(Color.BLACK);
+                            paint.setStyle(Paint.Style.FILL);
+                            float maxTextWidth = Float.parseFloat(coords[2].split(",")[0]) - Float.parseFloat(coords[0].split(",")[0]);
+                            float maxTextHeight = Float.parseFloat(coords[2].split(",")[1]) - Float.parseFloat(coords[0].split(",")[1]);
+                            float textHeight = 0;
+                            float textSize = 1;
+                            do {
+                                paint.setTextSize(textSize++);
+                                textHeight = paint.getFontMetrics().bottom - paint.getFontMetrics().top;
+                            } while (paint.measureText(parkSpace) < maxTextWidth && textHeight < maxTextHeight);
+
+                            if(textSize<5){
+                                textSize=25;
+                                paint.setTextSize(textSize);
+                                textHeight = paint.getFontMetrics().bottom - paint.getFontMetrics().top;
+                            }
+                            Log.d("MyApp", "textSize: " + textSize);
+                            float textWidth = paint.measureText(parkSpace);
+                            float centerX = (Float.parseFloat(coords[0].split(",")[0]) + Float.parseFloat(coords[2].split(",")[0])) / 2;
+                            float centerY = (Float.parseFloat(coords[0].split(",")[1]) + Float.parseFloat(coords[2].split(",")[1])) / 2;
+                            canvas.drawText(parkSpace, centerX - (textWidth / 2), centerY + (textHeight / 4), paint);
+
+
+
+
+                            DisplayMetrics displayMetrics = new DisplayMetrics();
+                            getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+                            int screenWidth = displayMetrics.widthPixels;
+                            float scaleFactor = (float) screenWidth / (float) newBitmap.getWidth();
+                            int newWidth = (int) (newBitmap.getWidth() * scaleFactor);
+                            int newHeight = (int) (newBitmap.getHeight() * scaleFactor);
+                            newBitmap = Bitmap.createScaledBitmap(newBitmap, newWidth, newHeight, true);
+                            Bitmap finalBitmap = newBitmap;
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    imgLot.setImageBitmap(finalBitmap);
+                                    imgLot.setScaleType(ImageView.ScaleType.MATRIX);
+                                    imgLot.setVisibility(View.VISIBLE);
+                                }
+                            });
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+                lotDisplay.start();
+            }
+            catch (JSONException e) {
+                Log.e("JSON klaida", "Pateikti nekorektiški rezervacijos duomenys");
+                e.printStackTrace();
+            }
+        }
+    }
+
+
 }

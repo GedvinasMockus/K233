@@ -90,13 +90,15 @@ public class MainActivity extends AppCompatActivity {
                     public void accept(String s) throws Exception {
                         int userID = -1;
                         String userUUID = "";
+                        String userEmail = "";
                         Log.e("TAG", s);
-                        if(s.contains("password")) {
+                        if(s.contains("id")) {
                             try {
                                 JSONArray jsonArr = new JSONArray(s);
                                 JSONObject json = jsonArr.getJSONObject(0);
                                 userID = json.getInt("id");
                                 userUUID = json.getString("uuid");
+                                userEmail = json.getString("email");
                             }
                             catch (JSONException e) {
                                 Log.e("JSON klaida", "Nepavyko nuskaityti prisijungimo patvirtinimo");
@@ -104,6 +106,7 @@ public class MainActivity extends AppCompatActivity {
                             }
                             editor.putString("UUID", userUUID);
                             editor.putInt("ID", userID);
+                            editor.putString("email", userEmail);
                             editor.commit();
                             Intent intent = new Intent(MainActivity.this, ParkActivity.class);
                             startActivity(intent);
