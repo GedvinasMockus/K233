@@ -8,6 +8,8 @@
 #include <BLEAdvertisedDevice.h>
 #include <BLEBeacon.h>
 #include <ArduinoJson.h>
+#include <map>
+#include <ctime>
 
 static const u1_t PROGMEM APPEUI[8] = { 0x39, 0x27, 0x5E, 0x85, 0x6A, 0xAC, 0xC9, 0x36 };
 static const u1_t PROGMEM DEVEUI[8] = { 0x39, 0xB1, 0x05, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
@@ -24,6 +26,12 @@ const int servoPinB2 = 15;
 const int parkingNum = 1;
 
 const int relay = 23;
+
+std::string trackingUuid = "";
+double trackingRssi = 0;
+double averageRssi = 0;
+int countScan = 0;
+std::map<std::string, time_t> openedBeacons;
 
 dr_t drSF = DR_SF7;
 
@@ -94,16 +102,21 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 
         uint16_t major = __builtin_bswap16(oBeacon.getMajor());
         uint16_t minor = __builtin_bswap16(oBeacon.getMinor());
-
         if (major == 10 && minor == 11) {
-          if (beaconCount < 3) {
+          if (beaconCount < 3 && trackingUuid.length() < 2) {
+            std::string uuid = oBeacon.getProximityUUID().toString();
+            std::map<std::string, time_t>::iterator it = openedBeacons.find(uuid);
+            if (it != openedBeacons.end()) {
+              return;
+            }
             BeaconInfo beaconInfo;
-
             beaconInfo.uuid = oBeacon.getProximityUUID().toString();
             beaconInfo.power = oBeacon.getSignalPower();
             beaconInfo.rssi = advertisedDevice.getRSSI();
             beaconInfo.distance = calculateDistance(beaconInfo.power, beaconInfo.rssi);
             beaconList[beaconCount++] = beaconInfo;
+          } else if (trackingUuid.compare(oBeacon.getProximityUUID().toString()) == 0) {
+            averageRssi += abs(advertisedDevice.getRSSI());
           }
         }
       }
@@ -137,7 +150,8 @@ void do_send(osjob_t* j) {
     }
     if (beaconCount != 0) {
       founded = true;
-
+      trackingUuid = beaconList[0].uuid;
+      trackingRssi = abs(beaconList[0].rssi) + 20;
       std::string str = beaconList[0].uuid;
 
       str.erase(std::remove_if(str.begin(), str.end(), [](char c) {
@@ -157,6 +171,10 @@ void do_send(osjob_t* j) {
 
       Serial.println(F("Packet queued"));
     } else {
+      trackingUuid = "";
+      trackingRssi = 0;
+      averageRssi = 0;
+      countScan = 0;
       Serial.println(F("Nera duomenu"));
       LMIC_sendAlive();
     }
@@ -219,8 +237,6 @@ void opening(long st) {
   }
 }
 void onEvent(ev_t ev) {
-  Serial.print(os_getTime());
-  Serial.print(": ");
   String status;
   String space;
   switch (ev) {
@@ -268,15 +284,15 @@ void onEvent(ev_t ev) {
       joined = true;
       memset(beaconList, 0, sizeof(beaconList));
       beaconCount = 0;
-      Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
       if (LMIC.dataLen) {
         StaticJsonDocument<128> json;
         deserializeJson(json, LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
         status = json["status"].as<String>();
         Serial.print("Received status: ");
         Serial.println(status);
-        if (strcasecmp(status.c_str(), "1") == 0) {
+        if (strcasecmp(status.c_str(), "1") == 0 && trackingUuid.length() > 2) {
           space = json["nr"].as<String>();
+          Serial.print("Vieta: ");
           Serial.println(space);
 
           digitalWrite(ledPin1, HIGH);
@@ -294,11 +310,14 @@ void onEvent(ev_t ev) {
         digitalWrite(ledPin2, LOW);
         digitalWrite(ledPin3, HIGH);
       }
+      averageRssi = 0;
+      countScan = 0;
+      trackingRssi = 0;
+      trackingUuid = "";
       founded = false;
       os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
       break;
     case EV_TXSTART:
-      Serial.println(F("EV_TXSTART"));
       break;
     case EV_JOIN_TXCOMPLETE:
       digitalWrite(ledPin1, LOW);
@@ -318,9 +337,42 @@ void onEvent(ev_t ev) {
 void servoWork() {
   digitalWrite(relay, HIGH);
   opening(14);
-  delay(4000);
+  bool openedBarrier = true;
+  while (openedBarrier) {
+    for (int i = 0; i < 3; i++) {
+      BLEScanResults foundDevices = pBLEScan->start(scanTime, true);
+      pBLEScan->clearResults();
+      countScan++;
+    }
+    averageRssi /= countScan;
+    Serial.print("Tracking: ");
+    Serial.print(trackingRssi);
+    Serial.print(" Average: ");
+    Serial.println(averageRssi);
+    if (averageRssi >= trackingRssi || averageRssi <= 1) {
+      openedBarrier = false;
+      openedBeacons[trackingUuid] = time(NULL);
+    } else {
+      trackingRssi = averageRssi + 2;
+    }
+    averageRssi = 0;
+    countScan = 0;
+  }
+
+  delay(3000);
   digitalWrite(relay, LOW);
   closing(14);
+}
+
+void removeOldBeacons() {
+  time_t now = time(NULL);
+  for (auto it = openedBeacons.begin(); it != openedBeacons.end();) {
+    if (difftime(now, it->second) > 20) {
+      it = openedBeacons.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 void setup() {
@@ -329,8 +381,8 @@ void setup() {
   pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true);
-  pBLEScan->setInterval(100);
-  pBLEScan->setWindow(99);
+  pBLEScan->setInterval(5);
+  pBLEScan->setWindow(4);
   pinMode(ledPin1, OUTPUT);
   pinMode(ledPin2, OUTPUT);
   pinMode(ledPin3, OUTPUT);
@@ -354,6 +406,13 @@ void setup() {
   do_send(&sendjob);
 }
 
+unsigned long previousMillis = 0;
+const long interval = 1000;
 void loop() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    removeOldBeacons();
+    previousMillis = currentMillis;
+  }
   os_runloop_once();
 }
