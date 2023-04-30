@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Reservation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,19 @@ class ReservationController extends Controller
 
         $space = DB::table('parking_space')->where('id', $id)->first();
 
-        return view('Reservation.Parking_Space', compact('id', 'lot', 'space'));
+        $reservations = Reservation::getSpaceAppointments($space->id);
+
+        foreach ($reservations as $reservation) {
+            $events[] = [
+                'title' => '',
+                'start' => $reservation->date_from,
+                'end' => $reservation->date_until,
+            ];
+        }
+
+        // dd($events);
+
+        return view('Reservation.Parking_Space', compact('id', 'lot', 'space', 'events'));
     }
 
     public function DisplayReservations()
