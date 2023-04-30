@@ -37,6 +37,8 @@ class ReservationController extends Controller
 
         $reservations = Reservation::getSpaceAppointments($space->id);
 
+        $events = [];
+
         foreach ($reservations as $reservation) {
             $events[] = [
                 'title' => '',
@@ -44,6 +46,8 @@ class ReservationController extends Controller
                 'end' => $reservation->date_until,
             ];
         }
+
+
 
         // dd($events);
 
