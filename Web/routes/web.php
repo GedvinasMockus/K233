@@ -90,6 +90,8 @@ Route::get('/Resertvation', [ReservationController::class, 'DisplayReservations'
 
 Route::post('/savelots', [ReservationController::class, 'SaveLots'])->name('SaveLots');
 
+Route::post('/MakeReservation', [ReservationController::class, 'MakeReservation'])->name('MakeReservation');
+
 
 
 

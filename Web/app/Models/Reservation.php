@@ -31,4 +31,5 @@ class Reservation extends Model
 
         return DB::table('reservation')->where('fk_Parking_spaceid', '=', $id)->get();
     }
+    public $timestamps = false;
 }
