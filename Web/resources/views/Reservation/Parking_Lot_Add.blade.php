@@ -36,6 +36,7 @@
                 <h1 id="test">Test</h1>
                 <button onclick="onSave(this)" id="c">Išsaugoti vietas</button>
                 <button onclick="onKeypress(this)" id="b">create mode (A): false</button>
+                <div>Paspausk B, kad ištrintum paskutinę nupieštą vietą</div>
                 <div class="containerofmap" id="image"></div>
                 {{-- <div>
                     <img class="containerofmap" id="image">
@@ -71,6 +72,28 @@
         if (e.key == "a" || e.tagName == "BUTTON") {
             create = !create;
             document.getElementById("b").innerHTML = "create mode (A): " + create;
+        }
+
+        else if (e.key == "b" || e.tagName == "BUTTON") {
+            allPoints.pop();
+
+            console.log("trint");
+
+            slots--;
+
+            var element = document.getElementById("polyline" + slots);
+            element.parentNode.removeChild(element);
+
+            slotsplus = slots + 1;
+
+            element = document.getElementById("polyline" + slotsplus);
+            element.setAttribute("id", "polyline" + slots);
+
+            element = document.getElementById("templine");
+            element.setAttribute("x1", 0);
+            element.setAttribute("y1", 0);
+            element.setAttribute("x2", 0);
+            element.setAttribute("y2", 0);
         }
     }
 
@@ -122,6 +145,7 @@
         if (!create) return;
 
         clicks++;
+
         if (clicks == 4) {
             clicks = 0;
             createSvg();
