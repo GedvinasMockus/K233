@@ -8,6 +8,7 @@
 #include <BLEAdvertisedDevice.h>
 #include <BLEBeacon.h>
 #include <ArduinoJson.h>
+#include <BLEServer.h>
 #include <map>
 #include <ctime>
 
@@ -26,6 +27,10 @@ const int servoPinB2 = 15;
 const int parkingNum = 1;
 
 const int relay = 23;
+
+#define MAJOR 20
+#define SIGNAL_POWER -70
+BLEAdvertising* pAdvertising;
 
 std::string trackingUuid = "";
 double trackingRssi = 0;
@@ -298,7 +303,15 @@ void onEvent(ev_t ev) {
           digitalWrite(ledPin1, HIGH);
           digitalWrite(ledPin2, LOW);
           digitalWrite(ledPin3, LOW);
+          BLEDevice::init(("Parking: " + space).c_str());
+
+          pAdvertising = BLEDevice::getAdvertising();
+          BLEDevice::startAdvertising();
+          int spaceNum = space.toInt();
+          setBeacon(spaceNum, trackingUuid);
+          pAdvertising->start();
           servoWork();
+          pAdvertising->stop();
         } else {
           digitalWrite(ledPin1, LOW);
           digitalWrite(ledPin2, LOW);
@@ -332,6 +345,35 @@ void onEvent(ev_t ev) {
       Serial.println((unsigned)ev);
       break;
   }
+}
+
+void setBeacon(int spaceNum, std::string trackingUUID) {
+
+  BLEBeacon oBeacon = BLEBeacon();
+  oBeacon.setManufacturerId(0x4C00);
+  String formattedUUID = formatUUID(trackingUUID.c_str());
+  oBeacon.setProximityUUID(BLEUUID(formattedUUID.c_str()));
+  oBeacon.setMajor(MAJOR);
+  oBeacon.setMinor(spaceNum);
+  oBeacon.setSignalPower(SIGNAL_POWER);
+  BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
+  oAdvertisementData.setFlags(0x04);
+  std::string strServiceData = "";
+  strServiceData += (char)26;
+  strServiceData += (char)0xFF;
+  strServiceData += oBeacon.getData();
+  oAdvertisementData.addData(strServiceData);
+  pAdvertising->setAdvertisementData(oAdvertisementData);
+}
+
+String formatUUID(String uuid) {
+  uuid.replace("-", "");
+  String reversedUUID = "";
+  for (int i = uuid.length() - 2; i >= 0; i -= 2) {
+    reversedUUID += uuid.substring(i, i + 2);
+  }
+  String formattedUUID = reversedUUID.substring(0, 8) + "-" + reversedUUID.substring(8, 12) + "-" + reversedUUID.substring(12, 16) + "-" + reversedUUID.substring(16, 20) + "-" + reversedUUID.substring(20);
+  return formattedUUID;
 }
 
 void servoWork() {
