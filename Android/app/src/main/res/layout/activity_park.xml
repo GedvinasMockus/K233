@@ -73,7 +73,7 @@
         android:layout_margin="10dp"
         android:fontFamily="@font/armata"
         android:paddingHorizontal="10dp"
-        android:text="Norint matyti parkavimo vietą įjungite interneto ryšį"
+        android:text="Įjungus GPS bus parodomas parkavimo vietos numeris. Papildomai įjungus internetą bus matomas žemėlapis su paryškinta parkavimo vieta"
         android:textColor="@color/black"
         android:textSize="14sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -92,5 +92,17 @@
         app:layout_constraintTop_toBottomOf="@+id/txtParkTitle"
         app:srcCompat="@drawable/ic_launcher_background"
         />
+
+    <Button
+        android:id="@+id/btnReserve"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/grey"
+        android:fontFamily="@font/armata"
+        android:text="Rezervuoti vietą"
+        android:textColor="@color/white"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnBarrier" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
