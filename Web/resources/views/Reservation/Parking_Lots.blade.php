@@ -4,13 +4,15 @@
         <div class="card">
             <div class="card-header">Aikštelės</div>
             <div class="card-body">
-                @if(Auth::user()->isAdmin())
-                <div class="row">
-                    <div class="col-12 text-center">
-                        <a href="{{ route('DisplayNewParkingLot') }}" class="btn btn-primary">Pridėti parkavimo aikštelę</a>
+                @auth
+                    @if(Auth::user()->isAdmin())
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <a href="{{ route('DisplayNewParkingLot') }}" class="btn btn-primary">Pridėti parkavimo aikštelę</a>
+                        </div>
                     </div>
-                </div>
-                @endif
+                    @endif
+                @endauth
                 <div class="d-grid p-2">
                     <table class="table table-hover">
                         <tr>
@@ -22,9 +24,11 @@
                         <tr data-href="/Parking_Lot/{{$lot->id}}">
                             <td>{{$lot->parking_name}}</td>
                             <td>{{$lot->city}} {{$lot->street}} {{$lot->street_number}}</td>
-                            @if(Auth::user()->isAdmin())
-                                <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
-                            @endif
+                            @auth
+                                @if(Auth::user()->isAdmin())
+                                    <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
+                                @endif
+                            @endauth
                         </tr>
                         @endforeach
                     </table>

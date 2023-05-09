@@ -6,11 +6,13 @@
                 <div class="col-4 text-center">
                     <a href="{{ route('DisplayParkingLots') }}" class="btn btn-primary">Aikštelės</a>
                 </div>
-                @if(Auth::user()->isAdmin())
-                <div class="col-4 text-center">
-                    <a href="{{ route('DisplayProfiles') }}" class="btn btn-primary">Vartotojų sąrašas</a>
-                </div>
-                @endif
+                @auth
+                    @if(Auth::user()->isAdmin())
+                    <div class="col-4 text-center">
+                        <a href="{{ route('DisplayProfiles') }}" class="btn btn-primary">Vartotojų sąrašas</a>
+                    </div>
+                    @endif
+                @endauth
                 <div class="col-4 text-center">
                     <a href="{{ route('DisplayHistory') }}" class="btn btn-primary">Mano istorija</a>
                 </div>
