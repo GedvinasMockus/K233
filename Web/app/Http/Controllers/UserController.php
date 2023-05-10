@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendRegistrationConfirmJob;
+use App\Models\Payment;
 use App\Models\User;
+use App\Rules\PaymentTimeRule;
 use Exception;
-use Illuminate\Auth\Events\Verified;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
+use WebToPay;
 
 class UserController extends Controller
 {
@@ -395,8 +396,95 @@ class UserController extends Controller
 
         return redirect()->route('DisplayProfile', ['id' => $userid]);
     }
-    public function DisplayBalance()
+    public function Add_balance(Request $request)
     {
-        return view('Profile.Balance');
+        $user = Auth::user();
+        $rules = [
+            'sum' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/', 'min:1', 'max:1000', new PaymentTimeRule]
+        ];
+        $customMessages = [
+            'required' => 'Privaloma įrašyti sumą!',
+            'numeric' => 'Blogas sumos formatas!',
+            'regex' => 'Blogas sumos formatas!',
+            'min' => 'Mažiausia balanso pildymo suma 1€!',
+            'max' => 'Daugiausiai galima pridėti prie balanso 1000€'
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            $data = $request->input();
+            $payment = new Payment;
+            $payment->price = $data['sum'];
+            $payment->date = date('Y-m-d H:i:s', time());
+            $payment->status = 1;
+            $payment->fk_Userid = $user->id;
+            $payment->save();
+            $id = $payment->id;
+            $padded_id = str_pad($id, 7, '0', STR_PAD_LEFT);
+            $pay = WebToPay::buildRequest([
+                'projectid' => '236497',
+                'sign_password' => '4f73fdc9fa66f6d72cebf14a7a85b653',
+                'orderid' => $padded_id,
+                'amount' => $data['sum'] * 100,
+                'p_email'        => $user->email,
+                'p_firstname'    => $user->name,
+                'p_lastname'    => $user->surname,
+                'currency' => 'EUR',
+                'country' => 'LT',
+                'accepturl' => url('/') . "/accept",
+                'cancelurl' => url('/') . "/cancel/$id",
+                'callbackurl' => url('/') . "/callback",
+                'test' => 1,
+            ]);
+            $payLink = "https://bank.paysera.com/pay/?data=" . $pay['data'] . "&sign=" . $pay['sign'];
+            return response()->json(['status' => 1, 'data' => $payLink]);
+        }
+    }
+    public function Accept()
+    {
+        return redirect("/")->with('successMes', 'Apmokėjimas patvirtintas!');
+    }
+
+    public function Cancel($id)
+    {
+        $updatePayment = Payment::find($id);
+        $updatePayment->status = 2;
+        $updatePayment->save();
+        return redirect("/")->with('errorMes', 'Apmokėjimas nesėkmingas!');
+    }
+
+    public function Callback(Request $request)
+    {
+        try {
+            $response = WebToPay::validateAndParseData(
+                $request->all(),
+                '236497',
+                '4f73fdc9fa66f6d72cebf14a7a85b653'
+            );
+            $updatePayment = Payment::find(intval($response['orderid']));
+            $updatePayment->status = 3;
+            $updatePayment->save();
+            $updateUser = User::find($updatePayment->fk_Userid);
+            $updateUser->balance = $updateUser->balance + $updatePayment->price;
+            $updateUser->save();
+            echo 'OK';
+        } catch (Exception $exception) {
+            $updatePayment = Payment::find(intval($response['orderid']));
+            $updatePayment->status = 2;
+            $updatePayment->save();
+            echo 'BAD';
+        }
+    }
+    public function UserSearch(Request $request)
+    {
+        $input =  $request->input('input');
+        $users = User::where('name', 'like', "%$input%")
+            ->orWhere('surname', 'like', "%$input%")
+            ->orWhere('email', 'like', "%$input%")
+            ->limit(10)
+            ->get(['id', 'name', 'surname', 'email']);
+        return response()->json(['items' => $users]);
     }
 }

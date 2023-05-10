@@ -1,4 +1,10 @@
-@extends('main') @section('content')
+@extends('main') @section('content') @if ($message=Session::get('successMes'))
+<div class="alert alert-success">
+    {{ $message }}
+</div>
+@elseif ($message=Session::get('errorMes'))
+<div class="alert alert-danger">{{ $message }}</div>
+@endif
 <div class="justify-content-center">
     <div class="col-md-12">
         <div class="card">
