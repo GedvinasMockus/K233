@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Main;
+use App\Http\Controllers\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,10 +20,4 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-Route::post('/', function (Request $request) {
-    app('App\Http\Controllers\Main')->InsertData($request->get("uuid", "n/a"));
-    // \Illuminate\Support\Facades\Storage::append(
-    //     "arduino-log.txt",
-    //     "uuid: " . $request->get("uuid", "n/a")
-    // );
-});
+

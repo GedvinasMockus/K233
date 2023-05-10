@@ -6,6 +6,7 @@ use App\Models\ParkingLot;
 use App\Models\ParkingSpace;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Rules\ReservationCheckRule;
 use App\Rules\ReservationConflictRule;
 use App\Rules\StartDateRule;
 use App\Rules\SufficientBalanceRule;
@@ -60,8 +61,6 @@ class ReservationController extends Controller
 
     public function MakeReservation(Request $request)
     {
-
-        Log::info($request);
         $rules = [
             'startDate' => ['required', 'date', new StartDateRule],
             'endDate' => ['required', 'date'],
@@ -91,6 +90,7 @@ class ReservationController extends Controller
             $reservation->is_inside = 0;
             $reservation->fk_Parking_spaceid = $data['id'];
             $reservation->fk_Userid = $user->id;
+            $reservation->is_admin_created = 0;
             $reservation->save();
             $updateUser = User::find($user->id);
             $updateUser->balance = $user->balance - $requiredCost;
@@ -102,10 +102,10 @@ class ReservationController extends Controller
 
             foreach ($reservations as $reservation) {
                 $events[] = [
-                    'title' => $reservation->fk_Userid == @auth()->user()->id ? "Jūsų rezervacija" : "Rezervacija",
+                    'title' => $reservation->fk_Userid == $user->id ? "Jūsų rezervacija" : "Rezervacija",
                     'start' => $reservation->date_from,
                     'end' => $reservation->date_until,
-                    'backgroundColor' =>  $reservation->fk_Userid == @auth()->user()->id ? "darkGreen" : "red",
+                    'backgroundColor' =>  $reservation->fk_Userid == $user->id ? "darkGreen" : "red",
                 ];
             }
             $events = json_encode($events);
@@ -115,7 +115,166 @@ class ReservationController extends Controller
 
     public function DisplayReservations()
     {
-        return view('Reservation.Reservation_List');
+        $user = Auth::user();
+        $reservations = Reservation::getReservations($user->id);
+
+        $events = [];
+        foreach ($reservations as $reservation) {
+            $description = [
+                'parking_name' => $reservation->parking_name,
+                'space_number' => $reservation->space_number,
+                'address' => $reservation->address,
+                'id' => $reservation->id,
+                'price' => $reservation->full_price
+            ];
+            $events[] = [
+                'start' => $reservation->date_from,
+                'end' => $reservation->date_until,
+                'backgroundColor' =>  "darkGreen",
+                'title' => "Rezervacija",
+                'extendedProps' => $description,
+            ];
+        }
+        $events = json_encode($events);
+        return view('Reservation.Reservation_List')->with(['events' => $events]);
+    }
+
+    public function RemoveReservation(Request $request)
+    {
+        $data = $request->input();
+        $rules = [
+            'id' => ['required', 'exists:reservation,id', new ReservationCheckRule],
+        ];
+        $customMessages = [
+            'required' => 'Privaloma pasirinkti naikinamą rezervuojamą laiką!',
+            'exists' => 'Rezervuojama vieta sistemoje neegzistuoja!'
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            $user = Auth::user();
+            $reservationRem = Reservation::findOrFail($data["id"]);
+            if (!$reservationRem->is_admin_created) {
+                $updateUser = User::find($user->id);
+                $updateUser->balance = $user->balance + $reservationRem->full_price;
+                $updateUser->save();
+            }
+            Reservation::find($data["id"])->delete();
+            $reservations = Reservation::getReservations($user->id);
+            $events = [];
+            foreach ($reservations as $reservation) {
+                $description = [
+                    'parking_name' => $reservation->parking_name,
+                    'space_number' => $reservation->space_number,
+                    'address' => $reservation->address,
+                    'id' => $reservation->id,
+                    'price' => $reservation->full_price
+                ];
+                $events[] = [
+                    'start' => $reservation->date_from,
+                    'end' => $reservation->date_until,
+                    'backgroundColor' =>  "darkGreen",
+                    'title' => "Rezervacija",
+                    'extendedProps' => $description,
+                ];
+            }
+            $events = json_encode($events);
+            return response()->json(['status' => 1, 'events' => $events]);
+        }
+    }
+
+    public function UserReservation($id)
+    {
+        $lot = DB::table('parking_space')
+            ->join('parking_lot', 'parking_space.fk_Parking_lotid', '=', 'parking_lot.id')->select('parking_lot.*')->where('parking_space.id', '=', $id)->first();
+
+        $space = DB::table('parking_space')->where('id', $id)->first();
+        $reservations = Reservation::getSpaceAppointments($space->id);
+
+        $events = [];
+
+        foreach ($reservations as $reservation) {
+            $userData = User::find($reservation->fk_Userid);
+            $description = [
+                'name' => $userData->name,
+                'surname' => $userData->surname,
+                'email' => $userData->email,
+                'isNewEvent' => true,
+            ];
+            $events[] = [
+                'title' => "Rezervacija",
+                'start' => $reservation->date_from,
+                'end' => $reservation->date_until,
+                'backgroundColor' =>  "red",
+                'extendedProps' => $description,
+            ];
+        }
+        $events = json_encode($events);
+        return view('Reservation.Parking_Space_Admin', compact('id', 'lot', 'space', 'events'));
+    }
+
+    public function MakeUserReservation(Request $request)
+    {
+        $data = $request->input();
+        Log::info(print_r($data, true));
+        $rules = [
+            'start' => ['required'],
+            'end' => ['required'],
+            'start[]' => ['date'],
+            'end[]' => ['date'],
+            'id' => ['required', 'exists:parking_space,id'],
+            'user' => ['required', 'exists:user,id'],
+        ];
+        $customMessages = [
+            'required' => 'Privaloma pasirinkti rezervuojamą laiką!',
+            'date' => 'Blogas rezervuojamo laiko formatas!',
+            'id.exists' => 'Rezervuojama vieta sistemoje neegzistuoja!',
+            'user.required' => 'Prašome pasirinkti darbuotoją!',
+            'user.exists' => 'Darbuotojas neegzistuoja sistemoje!'
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            for ($i = 0; $i < sizeof($data["start"]); $i++) {
+                $reservation = new Reservation;
+                Log::info(print_r($data['start'][$i], true));
+                $reservation->date_from = $data['start'][$i];
+                $reservation->date_until = $data['end'][$i];
+                $reservation->full_price = 0;
+                $reservation->is_inside = 0;
+                $reservation->fk_Parking_spaceid = $data['id'];
+                $reservation->fk_Userid = $data['user'];
+                $reservation->is_admin_created = 1;
+                $reservation->save();
+            }
+
+            $reservations = Reservation::getSpaceAppointments($data['id']);
+
+            $events = [];
+
+            foreach ($reservations as $reservation) {
+                $userData = User::find($reservation->fk_Userid);
+                $description = [
+                    'name' => $userData->name,
+                    'surname' => $userData->surname,
+                    'email' => $userData->email,
+                    'isNewEvent' => true,
+                ];
+                $events[] = [
+                    'title' => "Rezervacija",
+                    'start' => $reservation->date_from,
+                    'end' => $reservation->date_until,
+                    'backgroundColor' =>  "red",
+                    'extendedProps' => $description,
+                ];
+            }
+            $events = json_encode($events);
+            return response()->json(['status' => 1, 'events' => $events]);
+        }
     }
 
     public function DisplayEditParkingLot($id)
@@ -179,5 +338,10 @@ class ReservationController extends Controller
 
 
         return response()->json(['success' => 'Got Simple Ajax Request.']);
+    }
+
+    public function Test()
+    {
+        return view('Reservation.Test');
     }
 }
