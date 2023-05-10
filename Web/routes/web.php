@@ -67,8 +67,15 @@ Route::post('/Change_User_Status', [UserController::class, 'ChangeStatus'])->nam
 
 Route::Get('/History', [UserController::class, 'DisplayHistory'])->name('DisplayHistory');
 
-Route::Get('/Balance', [UserController::class, 'DisplayBalance'])->name('DisplayBalance');
+Route::Post('/Add_Balance', [UserController::class, 'Add_balance'])->name('Add_balance');
 
+Route::get('/accept', [UserController::class, 'Accept'])->name('Accept');
+
+Route::get('/cancel/{id}', [UserController::class, 'Cancel'])->name('Cancel');
+
+Route::get('/callback', [UserController::class, 'Callback'])->name('Callback');
+
+Route::get('/search_user', [UserController::class, 'UserSearch'])->name('UserSearch');
 
 
 
@@ -84,20 +91,16 @@ Route::get('/Parking_Space/{id}', [ReservationController::class, 'DisplayParking
 
 Route::get('/Edit_Parking_Lot/{id}', [ReservationController::class, 'DisplayEditParkingLot']);
 
-Route::get('/Resertvation', [ReservationController::class, 'DisplayReservations'])->name('DisplayReservations');
+Route::get('/Reservation', [ReservationController::class, 'DisplayReservations'])->name('DisplayReservations');
 
-// Route::post('/Parking_Lot_AddLots', [ReservationController::class, 'SaveLots'])->name('SaveLots');
+Route::post('/RemoveReservation', [ReservationController::class, 'RemoveReservation'])->name('RemoveReservation');
+
+Route::get('/Parking_Reservation_Admin/{id}', [ReservationController::class, 'UserReservation'])->name('UserReservation');;
 
 Route::post('/savelots', [ReservationController::class, 'SaveLots'])->name('SaveLots');
 
 Route::post('/MakeReservation', [ReservationController::class, 'MakeReservation'])->name('MakeReservation');
 
+Route::post('/MakeUserReservation', [ReservationController::class, 'MakeUserReservation'])->name('MakeUserReservation');
 
-
-
-
-
-
-
-
-Route::Get('/Random', [Main::class, 'DisplayMain'])->name('Random')->middleware('auth');
+Route::get('/Test', [ReservationController::class, 'Test'])->name('Test');

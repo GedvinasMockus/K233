@@ -16,8 +16,14 @@
         <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.6/index.global.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+        <script src="https://unpkg.com/popper.js/dist/umd/popper.min.js"></script>
+        <script src="https://unpkg.com/tooltip.js/dist/umd/tooltip.min.js"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+        <meta name="verify-paysera" content="4a7db98344b067a32fe159ea1a883ae1" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
         <!-- <link rel="stylesheet" href="/css/app.css" /> -->
     </head>
     <body>
@@ -29,9 +35,11 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNavDropdown">
                     <ul class="navbar-nav ms-start">
+                        @auth
                         <li class="nav-item">
-                            <a href="" class="nav-link text-uppercase">Test</a>
+                            <a href="{{ route('DisplayReservations') }}" class="nav-link text-uppercase">Rezervacijos</a>
                         </li>
+                        @endauth
                         <li class="nav-item">
                             <a href="" class="nav-link text-uppercase">Test</a>
                         </li>
@@ -58,7 +66,7 @@
                         </li>
                         @else
                         <li class="nav-item">
-                            <a class="nav-link text-uppercase" href=""> Test</a>
+                            <a class="nav-link text-uppercase addBalance" href=""><i class="fa-regular fa-money-bill-1"></i> {{ number_format(Auth::user()->balance, 2) }} € Papildyti</a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link text-uppercase dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">
@@ -84,7 +92,73 @@
                 </div>
             </div>
         </nav>
+
         <div class="container card navbar-light shadow-sm" style="background-color: rgb(180, 180, 180)">@yield('content')</div>
-        @yield('scripts')
+        @auth
+        <div class="modal fade" id="addBalance" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{{ route('Add_balance') }}" method="post" id="balance">
+                        @csrf
+                        <div class="modal-header">
+                            <h1 class="modal-title fs-5" id="exampleModalLabel">Balanso pildymas</h1>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <span>Įrašykite sumą, kokia norėtumėte papildyti savo paskyros balansą.</span><br />
+                            <div class="form-floating mt-3 col-6">
+                                <input type="number" name="sum" class="form-control" placeholder="Suma" id="floatingSum" min="1" step="0.01" />
+                                <label for="floatingSum">Suma</label>
+                            </div>
+                            <span class="text-danger error-text sum_error"></span>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Uždaryti</button>
+                            <button type="submit" class="btn btn-primary">Papildyti</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <script type="text/javascript">
+            $(document).ready(function () {
+                $('.addBalance').click(function (e) {
+                    e.preventDefault();
+                    $('#addBalance').find('input').val('');
+                    $('#addBalance').modal('show');
+                });
+            });
+            $(function () {
+                $('#balance').on('submit', function (e) {
+                    e.preventDefault();
+                    $.ajaxSetup({
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                        },
+                    });
+                    $.ajax({
+                        url: $(this).attr('action'),
+                        method: $(this).attr('method'),
+                        data: new FormData(this),
+                        processData: false,
+                        dataType: 'json',
+                        contentType: false,
+                        beforeSend: function () {
+                            $(document).find('span.error-text').text('');
+                        },
+                        success: function (data) {
+                            if (data.status == 0) {
+                                $.each(data.error, function (prefix, val) {
+                                    $('span.' + prefix + '_error').text(val[0]);
+                                });
+                            } else {
+                                window.location.href = data.data;
+                            }
+                        },
+                    });
+                });
+            });
+        </script>
+        @endauth @yield('scripts')
     </body>
 </html>

@@ -21,7 +21,7 @@
             <div class="row p-3">
                 <div class="col-12 col-lg-8 p-2" id="calendar"></div>
                 <div class="col-12 col-lg-4 p-2 d-lg-block">
-                    <div class="d-flex align-items-center justify-content-center h-100 w-100">
+                    <div class="d-flex mt-5 justify-content-center h-100 w-100">
                         <ul class="list-group w-100">
                             <li class="list-group-item">
                                 <span class="fw-bold">Aikštelė: </span><label id="lot" class="text-end">{{$lot->parking_name}}</label>
@@ -44,7 +44,11 @@
                             <li class="list-group-item">
                                 <button type="submit" class="btn btn-success" id="reserve-btn">Rezevuoti</button>
                             </li>
-                            @endauth
+                            @if (Auth::user()->role==4)
+                            <li class="list-group-item">
+                                <a href="{{ route('UserReservation', ['id' => $id]) }}" class="btn btn-warning">Darbuotojų rezervacija</a>
+                            </li>
+                            @endif @endauth
                         </ul>
                     </div>
                 </div>
@@ -72,6 +76,8 @@
             buttonText: { today: 'Šiandien' },
             selectable: true,
             selectOverlap: false,
+            selectLongPressDelay: 100,
+            eventLongPressDelay: 200,
 
             select: function (info) {
                 var now = moment();
