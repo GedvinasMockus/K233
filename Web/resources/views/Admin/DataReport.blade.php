@@ -34,7 +34,6 @@
 @endsection('content') @section('scripts')
 <script>
     function onSave() {
-        // console.log(allPoints);
         var from = document.getElementById("from").value;
         var to = document.getElementById("to").value;
 
@@ -86,8 +85,6 @@
 
                             data.reservations.forEach( function(rowData) {
                                 var row = document.createElement('tr');
-
-                                console.log(rowData);
 
                                 var cell = document.createElement('td');
                                 cell.appendChild(document.createTextNode(rowData['id']));
