@@ -40,21 +40,14 @@
                             <a href="{{ route('DisplayReservations') }}" class="nav-link text-uppercase">Rezervacijos</a>
                         </li>
                         @endauth
-                        <li class="nav-item">
-                            <a href="" class="nav-link text-uppercase">Test</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="" class="nav-link text-uppercase">Test</a>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link text-uppercase dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false"> Test </a>
-                            <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
-                                <li><a class="dropdown-item" href="">Test</a></li>
-                                <li><a class="dropdown-item" href="">Test</a></li>
-                                <li><a class="dropdown-item" href="">Test</a></li>
-                                <li><a class="dropdown-item" href="">Test</a></li>
-                            </ul>
-                        </li>
+                        @auth @if(Auth::user()->isAdmin())
+                            <li class="nav-item dropdown">
+                                <a class="nav-link text-uppercase dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false"> Valdymo skydas </a>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
+                                    <li><a class="dropdown-item" href="{{ route('DisplayDataReport') }}">Duomenų ataskaitos generavimas</a></li>
+                                </ul>
+                            </li>
+                        @endif @endauth
                     </ul>
                     <ul class="navbar-nav ms-auto">
                         @guest

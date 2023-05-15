@@ -1,0 +1,115 @@
+@extends('main') @section('content')
+<div class="alert alert-danger mt-2" id="errorPlace" hidden>
+    <span class="message" id="errorPlaceSpan" hidden></span>
+</div>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">Duomenų ataskaitos generavimas</div>
+            <div class="card-body">
+                <label for="from">Nuo:</label>
+                <input type="date" id="from" name="from">
+                <label for="to">Iki:</label>
+                <input type="date" id="to" name="to">
+
+                <button onclick="onSave(this)" id="">Generuoti ataskaitą</button>
+
+                <div class="alert alert-secondary mt-2" id="ReservationCountPlace" hidden>
+                    <span class="message" id="ReservationCountSpan"></span>
+                </div>
+                <div class="d-grid p-2">
+                    <table class="table table-hover" id="list" hidden>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nuo</th>
+                            <th>Iki</th>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection('content') @section('scripts')
+<script>
+    function onSave() {
+        // console.log(allPoints);
+        var from = document.getElementById("from").value;
+        var to = document.getElementById("to").value;
+
+        $(function () {
+            $.ajaxSetup({
+                headers: {
+                    "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content"),
+                },
+            });
+            $.ajax({
+                method: "post",
+                url: "/generatedatareport",
+                data: {
+                    from: from,
+                    to: to,
+                },
+                success: function (data) {
+                    var table = document.getElementById("list")
+
+                    while (table.firstChild) {
+                        table.removeChild(table.firstChild);
+                    }
+
+                    $('#ReservationCountPlace').prop('hidden', true);
+
+                    if (data.status == 0) {
+                        $('#errorPlace').prop('hidden', false);
+                        $('#errorPlaceSpan').prop('hidden', false);
+                        let errorArray = [];
+
+                        $.each(data.error, function (prefix, val) {
+                            let errorMsg = val[0];
+                            if (!errorArray.includes(errorMsg)) {
+                                errorArray.push(errorMsg);
+                            }
+                        });
+
+                        let errorMessage = errorArray.join('<br>');
+
+                        $('#errorPlaceSpan').html(errorMessage);
+                    } else {
+                        
+                        $('#ReservationCountPlace').prop('hidden', false);
+                        $('#ReservationCountSpan').html('Rezervacijų kiekis šiame laiko tarpe: ' + data.count + '!');
+
+                        if(data.count > 0)
+                        {
+                            $('#list').prop('hidden', false);
+                            var tableBody = document.createElement('tbody');
+
+                            data.reservations.forEach( function(rowData) {
+                                var row = document.createElement('tr');
+
+                                console.log(rowData);
+
+                                var cell = document.createElement('td');
+                                cell.appendChild(document.createTextNode(rowData['id']));
+                                row.appendChild(cell);
+
+                                cell = document.createElement('td');
+                                cell.appendChild(document.createTextNode(rowData['date_from']));
+                                row.appendChild(cell);
+
+                                cell = document.createElement('td');
+                                cell.appendChild(document.createTextNode(rowData['date_until']));
+                                row.appendChild(cell);
+
+                                tableBody.appendChild(row);
+                            });
+
+                            table.appendChild(tableBody);
+                        }
+                    }
+                },
+            });
+        });
+    }
+</script>
+@endsection('scripts')

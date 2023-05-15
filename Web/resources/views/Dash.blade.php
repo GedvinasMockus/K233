@@ -12,23 +12,13 @@
                 <div class="col-4 text-center">
                     <a href="{{ route('DisplayParkingLots') }}" class="btn btn-primary">Aikštelės</a>
                 </div>
-                @auth
-                    @if(Auth::user()->isAdmin())
-                    <div class="col-4 text-center">
-                        <a href="{{ route('DisplayProfiles') }}" class="btn btn-primary">Vartotojų sąrašas</a>
-                    </div>
-                    @endif
-                @endauth
+                @auth @if(Auth::user()->isAdmin())
+                <div class="col-4 text-center">
+                    <a href="{{ route('DisplayProfiles') }}" class="btn btn-primary">Vartotojų sąrašas</a>
+                </div>
+                @endif @endauth
                 <div class="col-4 text-center">
                     <a href="{{ route('DisplayHistory') }}" class="btn btn-primary">Mano istorija</a>
-                </div>
-            </div>
-            <div class="row mt-5 mb-5">
-                <div class="col-6 text-center">
-                    <a href="{{ route('DisplayBalance') }}" class="btn btn-primary">Balanso pildymas</a>
-                </div>
-                <div class="col-6 text-center">
-                    <a href="{{ route('DisplayReservations') }}" class="btn btn-primary">Mano rezervacijos</a>
                 </div>
             </div>
         </div>

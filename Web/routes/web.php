@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Main;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -104,3 +105,10 @@ Route::post('/MakeReservation', [ReservationController::class, 'MakeReservation'
 Route::post('/MakeUserReservation', [ReservationController::class, 'MakeUserReservation'])->name('MakeUserReservation');
 
 Route::get('/Test', [ReservationController::class, 'Test'])->name('Test');
+
+
+// Admin routes
+
+Route::Get('/DataReport', [AdminController::class, 'DisplayDataReport'])->name('DisplayDataReport');
+
+Route::post('/generatedatareport', [AdminController::class, 'GenerateDataReport'])->name('GenerateDataReport');
