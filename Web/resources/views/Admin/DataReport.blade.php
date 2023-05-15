@@ -23,6 +23,7 @@
                             <th>ID</th>
                             <th>Nuo</th>
                             <th>Iki</th>
+                            <th>Kaina</th>
                         </tr>
                     </table>
                 </div>
@@ -53,11 +54,10 @@
                 success: function (data) {
                     var table = document.getElementById("list")
 
-                    while (table.firstChild) {
-                        table.removeChild(table.firstChild);
-                    }
+                    $("#list").find("tr:not(:first)").remove();
 
                     $('#ReservationCountPlace').prop('hidden', true);
+                    $('#list').prop('hidden', true);
 
                     if (data.status == 0) {
                         $('#errorPlace').prop('hidden', false);
@@ -101,10 +101,37 @@
                                 cell.appendChild(document.createTextNode(rowData['date_until']));
                                 row.appendChild(cell);
 
+                                cell = document.createElement('td');
+                                cell.appendChild(document.createTextNode(rowData['full_price']));
+                                row.appendChild(cell);
+
                                 tableBody.appendChild(row);
                             });
 
                             table.appendChild(tableBody);
+
+                            var tableFoot = document.createElement('tfoot');
+                            row = document.createElement('tr');
+
+                            cell = document.createElement('td');
+                            cell.appendChild(document.createTextNode('Suma:'));
+                            row.appendChild(cell);
+
+                            cell = document.createElement('td');
+                            cell.appendChild(document.createTextNode(''));
+                            row.appendChild(cell);
+
+                            cell = document.createElement('td');
+                            cell.appendChild(document.createTextNode(''));
+                            row.appendChild(cell);
+
+                            cell = document.createElement('td');
+                            cell.appendChild(document.createTextNode(data.sum));
+                            row.appendChild(cell);
+
+                            tableFoot.appendChild(row);
+
+                            table.appendChild(tableFoot);
                         }
                     }
                 },
