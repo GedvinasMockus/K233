@@ -34,10 +34,12 @@ class AdminController extends Controller
         } else {
             $query = DB::table('reservation')->where('date_from', '>', $request->input('from'))->where('date_until', '<', $request->input('to'));
             $count = $query->count();
-            $reservations = $query->select('id', 'date_from', 'date_until')->get();
+            $reservations = $query->select('id', 'date_from', 'date_until', 'full_price')->get();
             Log::info($reservations);
 
-            return response()->json(['status' => 1, 'count' => $count, 'reservations' => $reservations]);
+            $sum = $reservations->sum('full_price');
+
+            return response()->json(['status' => 1, 'count' => $count, 'reservations' => $reservations, 'sum' => $sum]);
         }
     }
 }
