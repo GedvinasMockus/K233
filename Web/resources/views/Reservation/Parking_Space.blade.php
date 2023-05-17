@@ -21,7 +21,7 @@
             <div class="row p-3">
                 <div class="col-12 col-lg-8 p-2" id="calendar"></div>
                 <div class="col-12 col-lg-4 p-2 d-lg-block">
-                    <div class="d-flex mt-5 justify-content-center h-100 w-100">
+                    <div class="mt-5 justify-content-center h-100 w-100">
                         <ul class="list-group w-100">
                             <li class="list-group-item">
                                 <span class="fw-bold">Aikštelė: </span><label id="lot" class="text-end">{{$lot->parking_name}}</label>
@@ -40,7 +40,14 @@
                             <li class="list-group-item"><span class="fw-bold">Iki: </span><label id="endDate">Nepasirinkta</label></li>
                             <li class="list-group-item"><span class="fw-bold">Rezervuotas laikas: </span><label id="hours">Nepasirinkta</label></li>
                             <li class="list-group-item"><span class="fw-bold">Galutinė suma: </span><label id="price">Nežinoma</label></li>
-                            @auth
+                        </ul>
+                        <ul class="list-group w-100 mt-2" id="reservationUpdate" hidden>
+                            <li class="list-group-item"><span class="fw-bold">Rezervacija nuo: </span><label id="startDateReservation">Nežinoma</label></li>
+                            <li class="list-group-item"><span class="fw-bold">Rezervacija iki: </span><label id="endDateReservation">Nežinoma</label></li>
+                            <li class="list-group-item"><span class="fw-bold">Rezervacijos laikas: </span><label id="hoursReservation">Nežinoma</label></li>
+                        </ul>
+                        @auth
+                        <ul class="list-group w-100 mt-2">
                             <li class="list-group-item">
                                 <button type="submit" class="btn btn-success" id="reserve-btn">Rezevuoti</button>
                             </li>
@@ -48,8 +55,9 @@
                             <li class="list-group-item">
                                 <a href="{{ route('UserReservation', ['id' => $id]) }}" class="btn btn-warning">Darbuotojų rezervacija</a>
                             </li>
-                            @endif @endauth
+                            @endif
                         </ul>
+                        @endauth
                     </div>
                 </div>
             </div>
@@ -59,17 +67,23 @@
 @endsection('content') @section('scripts')
 <script>
     var selectedEvents = [];
+    var reservationUpdate = [];
     var dataEvents = '{!! $events !!}';
+    var parsed = JSON.parse(dataEvents);
+    var oldest, newest;
+    var calendar;
+    var eventDates = reloadInfo(parsed);
+
     document.addEventListener('DOMContentLoaded', function () {
         var calendarEl = document.getElementById('calendar');
-
-        var calendar = new FullCalendar.Calendar(calendarEl, {
+        const today = new Date();
+        calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'timeGridWeek',
             slotMinTime: '0:00:00',
             slotMaxTime: '24:00:00',
             allDaySlot: false,
             firstDay: 1,
-            events: JSON.parse(dataEvents),
+            events: parsed,
             locale: 'lt',
             dayHeaderFormat: { weekday: 'short', month: 'numeric', day: 'numeric', omitCommas: true },
             slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
@@ -78,6 +92,9 @@
             selectOverlap: false,
             selectLongPressDelay: 100,
             eventLongPressDelay: 200,
+            validRange: {
+                start: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000),
+            },
 
             select: function (info) {
                 var now = moment();
@@ -87,6 +104,7 @@
                 var formattedEnd = moment(eventEnd).format('YYYY-MM-DD HH:mm:ss');
                 var eventDuration = moment.duration(moment(eventEnd).diff(moment(eventStart)));
                 var eventHours = eventDuration.asHours();
+
                 var isFound = selectedEvents.some(function (event) {
                     return event.start === formattedEnd || event.end === formattedStart;
                 });
@@ -102,7 +120,26 @@
                 var lastBefore = selectedEvents.find(function (event) {
                     return moment(event.endUnformatted).isBefore(eventEnd);
                 });
-                if (moment(eventEnd).isAfter(now) && eventHours >= 0.5 && (selectedEvents.length == 0 || isFound)) {
+                var timeCheck = moment().set('second', 0);
+                timeCheck.minute(timeCheck.minute() < 30 ? 0 : 30);
+                var startTime = moment(eventStart, 'YYYY-MM-DD HH:mm:ss').set('second', 0);
+                timeCheck = timeCheck.format('YYYY-MM-DD HH:mm:ss');
+                startTime = startTime.format('YYYY-MM-DD HH:mm:ss');
+                if (!moment(startTime).isBefore(timeCheck) && moment(eventEnd).isAfter(now) && eventHours >= 0.5 && (selectedEvents.length == 0 || isFound)) {
+                    calendar.getEvents().forEach(function (calEvent) {
+                        if (moment(calEvent.start).isSame(moment(formattedEnd)) || (moment(calEvent.end).isSame(moment(formattedStart)) && calEvent.backgroundColor != 'red')) {
+                            if (
+                                eventDates.some(function (event) {
+                                    return moment(event.start).isSame(calEvent.start) && moment(event.end).isSame(calEvent.end) && calEvent.backgroundColor != 'red';
+                                })
+                            ) {
+                                calEvent.setProp('title', 'Redaguojama rezervacija');
+                                calEvent.setProp('backgroundColor', 'limegreen');
+                                reservationUpdate.push(calEvent);
+                            }
+                        }
+                    });
+
                     var newStart, newEnd;
                     if (firstAfter) {
                         newEnd = moment(firstAfter.endUnformatted);
@@ -144,11 +181,11 @@
 
                     fillBill();
                 }
-
+                extraBill(reservationUpdate, selectedEvents);
                 calendar.unselect();
             },
             eventClick: function (info) {
-                if (info.event.backgroundColor === 'red' || info.event.backgroundColor === 'darkGreen') {
+                if (info.event.backgroundColor === 'red' || info.event.backgroundColor === 'darkGreen' || info.event.backgroundColor === 'limegreen') {
                     return false;
                 }
                 var eventStart = moment(info.event.start).format('YYYY-MM-DD HH:mm:ss');
@@ -157,11 +194,53 @@
                     return !(event.start === eventStart && event.end === eventEnd);
                 });
                 fillBill();
+                reservationUpdate = [];
+                calendar.removeAllEvents();
+                calendar.addEventSource(parsed);
                 info.event.remove();
             },
         });
+
         calendar.render();
     });
+
+    function reloadInfo(eventInfos) {
+        makeDates = [];
+        for (let i = 0; i < eventInfos.length; i++) {
+            let start = moment(eventInfos[i].start).format('YYYY-MM-DD HH:mm:ss');
+            let end = moment(eventInfos[i].end).format('YYYY-MM-DD HH:mm:ss');
+            makeDates.push({ start: start, end: end });
+        }
+        return makeDates;
+    }
+    function extraBill(reservationUpdate) {
+        if (reservationUpdate.length > 0) {
+            const allEvents = reservationUpdate.concat(selectedEvents);
+            const { earliestStart, latestEnd } = allEvents.reduce(
+                (acc, event) => {
+                    const { start, end } = event;
+                    if (!acc.earliestStart || moment(start).isBefore(moment(acc.earliestStart))) {
+                        acc.earliestStart = start;
+                    }
+                    if (!acc.latestEnd || moment(end).isAfter(moment(acc.latestEnd))) {
+                        acc.latestEnd = end;
+                    }
+                    return acc;
+                },
+                { earliestStart: null, latestEnd: null }
+            );
+            $('#reservationUpdate').prop('hidden', false);
+            var eventDuration = moment.duration(moment(latestEnd).diff(moment(earliestStart)));
+            var eventHours = eventDuration.asHours();
+            var fullPrice = (price * eventHours).toFixed(2);
+            oldest = moment(earliestStart).format('YYYY-MM-DD HH:mm:ss');
+            newest = moment(latestEnd).format('YYYY-MM-DD HH:mm:ss');
+            $('#startDateReservation').text(oldest);
+            $('#endDateReservation').text(newest);
+            $('#hoursReservation').text(eventHours + 'h');
+        }
+    }
+
     function fillBill() {
         var price = '{!! $lot->tariff !!}';
         if (selectedEvents.length != 0) {
@@ -177,6 +256,10 @@
             $('#endDate').text('Nepasirinkta');
             $('#hours').text('Nepasirinkta');
             $('#price').text('Nežinoma');
+            $('#startDateReservation').text('Nežinoma');
+            $('#endDateReservation').text('Nežinoma');
+            $('#hoursReservation').text('Nežinoma');
+            $('#reservationUpdate').prop('hidden', true);
         }
     }
     $('#reserve-btn').click(function (e) {
@@ -190,6 +273,18 @@
             formData.set('id', '{!! $space->id !!}');
             formData.set('hours', eventHours);
         }
+        if (reservationUpdate.length > 0) {
+            var dataSend = [];
+            for (let i = 0; i < reservationUpdate.length; i++) {
+                let start = moment(reservationUpdate[i].start).format('YYYY-MM-DD HH:mm:ss');
+                let end = moment(reservationUpdate[i].end).format('YYYY-MM-DD HH:mm:ss');
+                dataSend.push({ start: start, end: end });
+            }
+            formData.set('oldData', JSON.stringify(dataSend));
+            formData.set('oldest', oldest);
+            formData.set('newest', newest);
+        }
+
         $.ajaxSetup({
             headers: {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
@@ -225,22 +320,19 @@
 
                     $('#errorPlaceSpan').html(errorMessage);
                 } else {
-                    localStorage.setItem('reservationSuccess', true);
-                    setTimeout(function () {
-                        location.reload();
-                    }, 0);
+                    $('#successPlace').prop('hidden', false);
+                    $('#successPlaceSpan').prop('hidden', false);
+                    $('#successPlaceSpan').text('Rezervacija sėkminga!');
+                    calendar.removeAllEvents();
+                    calendar.addEventSource(JSON.parse(data.events));
+                    selectedEvents = [];
+                    reservationUpdate = [];
+                    parsed = JSON.parse(data.events);
+                    eventDates = reloadInfo(parsed);
+                    calendar.render();
                 }
             },
         });
-    });
-    $(document).ready(function () {
-        if (localStorage.getItem('reservationSuccess')) {
-            $('#successPlace').prop('hidden', false);
-            $('#successPlaceSpan').prop('hidden', false);
-            $('#successPlaceSpan').text('Rezervacija sėkminga!');
-
-            localStorage.removeItem('reservationSuccess');
-        }
     });
 </script>
 @endsection('scripts')

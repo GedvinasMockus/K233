@@ -103,4 +103,8 @@ Route::post('/MakeReservation', [ReservationController::class, 'MakeReservation'
 
 Route::post('/MakeUserReservation', [ReservationController::class, 'MakeUserReservation'])->name('MakeUserReservation');
 
+Route::post('/UpdateReservation', [ReservationController::class, 'UpdateReservation'])->name('UpdateReservation');
+
+Route::get('/EditReservation/{id}', [ReservationController::class, 'EditReservation'])->name('EditReservation');
+
 Route::get('/Test', [ReservationController::class, 'Test'])->name('Test');

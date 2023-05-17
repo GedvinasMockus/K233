@@ -7,10 +7,15 @@ use App\Models\ParkingSpace;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Rules\ReservationCheckRule;
+use App\Rules\ReservationCombineRule;
+use App\Rules\ReservationConflictAdminRule;
 use App\Rules\ReservationConflictRule;
+use App\Rules\ReservationUpdateConflictRule;
+use App\Rules\StartDateAdminRule;
 use App\Rules\StartDateRule;
 use App\Rules\SufficientBalanceRule;
 use App\Rules\ValidHoursRule;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -61,11 +66,15 @@ class ReservationController extends Controller
 
     public function MakeReservation(Request $request)
     {
+        $data = $request->input();
         $rules = [
             'startDate' => ['required', 'date', new StartDateRule],
             'endDate' => ['required', 'date'],
-            'id' => ['required', 'exists:parking_space,id', new ReservationConflictRule($request->startDate, $request->endDate, $request->id), new SufficientBalanceRule],
+            'id' => ['required', 'exists:parking_space,id', new ReservationConflictRule($request->startDate, $request->endDate, $request->id), new SufficientBalanceRule()],
             'hours' => ['required', new ValidHoursRule],
+            'oldData' => [new ReservationCombineRule($request->id)],
+            'newest' => ['date'],
+            'oldest' => ['date']
         ];
         $customMessages = [
             'required' => 'Privaloma pasirinkti rezervuojamą laiką!',
@@ -77,17 +86,37 @@ class ReservationController extends Controller
         if ($validator->fails()) {
             return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
         } else {
-            $data = $request->input();
-            $user = Auth::user();
             $space = ParkingSpace::findOrFail($data["id"]);
             $lot = ParkingLot::findOrFail($space->fk_Parking_lotid);
             $tariff = $lot->tariff;
             $requiredCost = $data["hours"] * $tariff;
+            $user = Auth::user();
+            $oldest = $data['startDate'];
+            $newest = $data['endDate'];
+            $isInside = 0;
+            if (!empty($data['oldData'])) {
+                $oldest = $data['oldest'];
+                $newest = $data['newest'];
+                $oldData = json_decode($data['oldData'], true);
+                for ($i = 0; $i < sizeof($oldData); $i++) {
+                    $oldRezervation = Reservation::where([
+                        ['date_from', '=', $oldData[$i]['start']],
+                        ['date_until', '=', $oldData[$i]['end']],
+                        ['fk_Userid', '=', $user->id],
+                        ['fk_Parking_spaceid', '=', $data['id']],
+                    ])->firstOrFail();
+                    if ($oldRezervation->is_inside == 1) {
+                        $isInside = 1;
+                    }
+                    $requiredCost += $oldRezervation->full_price;
+                    $oldRezervation->delete();
+                }
+            }
             $reservation = new Reservation;
-            $reservation->date_from = $data['startDate'];
-            $reservation->date_until = $data['endDate'];
+            $reservation->date_from = $oldest;
+            $reservation->date_until = $newest;
             $reservation->full_price = $requiredCost;
-            $reservation->is_inside = 0;
+            $reservation->is_inside = $isInside;
             $reservation->fk_Parking_spaceid = $data['id'];
             $reservation->fk_Userid = $user->id;
             $reservation->is_admin_created = 0;
@@ -113,11 +142,11 @@ class ReservationController extends Controller
         }
     }
 
-    public function DisplayReservations()
+    public function DisplayReservations(Request $request)
     {
         $user = Auth::user();
         $reservations = Reservation::getReservations($user->id);
-
+        $success = $request->query('success');
         $events = [];
         foreach ($reservations as $reservation) {
             $description = [
@@ -136,8 +165,14 @@ class ReservationController extends Controller
             ];
         }
         $events = json_encode($events);
-        return view('Reservation.Reservation_List')->with(['events' => $events]);
+
+        if ($success) {
+            return redirect()->route('DisplayReservations')->with('success', 'Rezervacija atnaujinta sėkmingai!');
+        } else {
+            return view('Reservation.Reservation_List')->with(['events' => $events, 'success' => $request->session()->get('success')]);
+        }
     }
+
 
     public function RemoveReservation(Request $request)
     {
@@ -156,11 +191,9 @@ class ReservationController extends Controller
         } else {
             $user = Auth::user();
             $reservationRem = Reservation::findOrFail($data["id"]);
-            if (!$reservationRem->is_admin_created) {
-                $updateUser = User::find($user->id);
-                $updateUser->balance = $user->balance + $reservationRem->full_price;
-                $updateUser->save();
-            }
+            $updateUser = User::find($user->id);
+            $updateUser->balance = $user->balance + $reservationRem->full_price;
+            $updateUser->save();
             Reservation::find($data["id"])->delete();
             $reservations = Reservation::getReservations($user->id);
             $events = [];
@@ -182,6 +215,116 @@ class ReservationController extends Controller
             }
             $events = json_encode($events);
             return response()->json(['status' => 1, 'events' => $events]);
+        }
+    }
+
+    public function EditReservation($id)
+    {
+        $lot = DB::table('reservation')
+            ->join('parking_space', 'reservation.fk_Parking_spaceid', '=', 'parking_space.id')
+            ->join('parking_lot', 'parking_space.fk_Parking_lotid', '=', 'parking_lot.id')
+            ->select(
+                'parking_lot.*',
+                'reservation.*',
+                'parking_space.space_number',
+                DB::raw('FORMAT(TIMESTAMPDIFF(MINUTE, reservation.date_from, reservation.date_until) / 60, IF(FLOOR(TIMESTAMPDIFF(MINUTE, reservation.date_from, reservation.date_until) / 60) = (TIMESTAMPDIFF(MINUTE, reservation.date_from, reservation.date_until) / 60), 0, 1)) AS hour_amount')
+            )
+            ->where('reservation.id', '=', $id)
+            ->first();
+
+
+        $space = Reservation::findOrFail($lot->fk_Parking_spaceid);
+        $reservations = Reservation::getSpaceAppointments($space->id);
+        $user = Auth::user();
+        $events = [];
+
+        foreach ($reservations as $reservation) {
+            $description = [
+                'isUserEvent' => $reservation->fk_Userid == $user->id ? true : false,
+            ];
+            $events[] = [
+                'title' => $reservation->fk_Userid == $user->id ? "Jūsų rezervacija" : "Rezervacija",
+                'start' => $reservation->date_from,
+                'end' => $reservation->date_until,
+                'backgroundColor' =>  $reservation->id == $id ? "darkGreen" : "grey",
+                'extendedProps' => $description,
+            ];
+        }
+        $events = json_encode($events);
+        return view('Reservation.Reservation_Edit')->with(['id' => $id, 'lot' => $lot, 'space' => $space, 'events' => $events]);
+    }
+
+    public function UpdateReservation(Request $request)
+    {
+        $data = $request->input();
+        $rules = [
+            'startDate' => ['required', 'date'],
+            'endDate' => ['required', 'date', new StartDateRule],
+            'id' => ['required', 'exists:reservation,id', new ReservationUpdateConflictRule($request->startDate, $request->endDate, $request->id), new SufficientBalanceRule($request->id)],
+            'hours' => ['required', new ValidHoursRule],
+            'oldData' => [new ReservationCombineRule((Reservation::findOrFail($request->id)->fk_Parking_spaceid))],
+            'newest' => ['date'],
+            'oldest' => ['date']
+        ];
+        $customMessages = [
+            'required' => 'Privaloma pasirinkti rezervuojamą laiką!',
+            'date' => 'Blogas rezervuojamo laiko formatas!',
+            'exists' => 'Redaguojama reservacija nerasta!'
+        ];
+        $validator = Validator::make($request->all(), $rules, $customMessages);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
+        } else {
+            $reservation = Reservation::find($data["id"]);
+            $space = ParkingSpace::findOrFail($reservation->fk_Parking_spaceid);
+            $lot = ParkingLot::findOrFail($space->fk_Parking_lotid);
+            $start = Carbon::parse($reservation->date_from);
+            $end = Carbon::parse($reservation->date_until);
+            $minutesDifference = $end->diffInMinutes($start);
+            $hoursDifference = $minutesDifference / 60;
+            $tariff = $lot->tariff;
+            $fullPrice = ($tariff * ($data["hours"] - $hoursDifference));
+            if ($reservation->full_price  <= -$fullPrice) {
+                $fullPrice = $reservation->full_price * -1;
+            }
+            $reservationPrice = $reservation->full_price + $fullPrice;
+            if ($reservationPrice <= 0) {
+                $reservationPrice = 0;
+            }
+
+            $user = Auth::user();
+            $oldest = $data['startDate'];
+            $newest = $data['endDate'];
+            $isInside = 0;
+            if (!empty($data['oldData'])) {
+                $oldest = $data['oldest'];
+                $newest = $data['newest'];
+                $oldData = json_decode($data['oldData'], true);
+                for ($i = 0; $i < sizeof($oldData); $i++) {
+                    $oldRezervation = Reservation::where([
+                        ['date_from', '=', $oldData[$i]['start']],
+                        ['date_until', '=', $oldData[$i]['end']],
+                        ['fk_Userid', '=', $user->id],
+                        ['fk_Parking_spaceid', '=', $reservation->fk_Parking_spaceid],
+                    ])->firstOrFail();
+                    if ($oldRezervation->is_inside == 1) {
+                        $isInside = 1;
+                    }
+                    $reservationPrice  += $oldRezervation->full_price;
+                    $oldRezervation->delete();
+                }
+            }
+            $reservation->date_from = $oldest;
+            $reservation->date_until = $newest;
+            $reservation->full_price = $reservationPrice;
+            $reservation->is_inside = $isInside;
+            $reservation->is_admin_created = 0;
+            $reservation->save();
+            $updateUser = User::find($user->id);
+            $updateUser->balance = $user->balance - $fullPrice;
+            $updateUser->save();
+            return response()->json(['status' => 1]);
         }
     }
 
@@ -218,9 +361,8 @@ class ReservationController extends Controller
     public function MakeUserReservation(Request $request)
     {
         $data = $request->input();
-        Log::info(print_r($data, true));
         $rules = [
-            'start' => ['required'],
+            'start' => ['required', new ReservationConflictAdminRule($data['start'], $data['end'], $data['id'], $data['user']), new StartDateAdminRule($data['start'])],
             'end' => ['required'],
             'start[]' => ['date'],
             'end[]' => ['date'],
@@ -240,12 +382,41 @@ class ReservationController extends Controller
             return response()->json(['status' => 0, 'error' => $validator->errors()->toArray()]);
         } else {
             for ($i = 0; $i < sizeof($data["start"]); $i++) {
+                $combineReserBefore = Reservation::where([
+                    ['fk_Userid', '=', $data['user']],
+                    ['fk_Parking_spaceid', '=', $data['id']],
+                    ['date_until', '=', $data['start'][$i]]
+                ])->first();
+                $combineReserAfter = Reservation::where([
+                    ['fk_Userid', '=', $data['user']],
+                    ['fk_Parking_spaceid', '=', $data['id']],
+                    ['date_from', '=', $data['end'][$i]]
+                ])->first();
+                $price = 0;
+                $isInside = 0;
+                $start = $data['start'][$i];
+                $end = $data['end'][$i];
+                if (!empty($combineReserBefore)) {
+                    $price += $combineReserBefore->full_price;
+                    if ($combineReserBefore->is_inside == 1) {
+                        $isInside = 1;
+                    }
+                    $start = $combineReserBefore->date_from;
+                    $combineReserBefore->delete();
+                }
+                if (!empty($combineReserAfter)) {
+                    $price += $combineReserAfter->full_price;
+                    if ($combineReserAfter->is_inside == 1) {
+                        $isInside = 1;
+                    }
+                    $end = $combineReserAfter->date_until;
+                    $combineReserAfter->delete();
+                }
                 $reservation = new Reservation;
-                Log::info(print_r($data['start'][$i], true));
-                $reservation->date_from = $data['start'][$i];
-                $reservation->date_until = $data['end'][$i];
-                $reservation->full_price = 0;
-                $reservation->is_inside = 0;
+                $reservation->date_from = $start;
+                $reservation->date_until = $end;
+                $reservation->full_price = $price;
+                $reservation->is_inside = $isInside;
                 $reservation->fk_Parking_spaceid = $data['id'];
                 $reservation->fk_Userid = $data['user'];
                 $reservation->is_admin_created = 1;

@@ -1,4 +1,9 @@
-@extends('main') @section('content')
+@extends('main') @section('content') @if ($success)
+<div class="alert alert-success">
+    {{ $success }}
+</div>
+@endif
+
 <div class="alert alert-danger mt-2" id="errorReservation" hidden>
     <span class="message" id="errorReservationSpan" hidden></span>
 </div>
@@ -42,7 +47,8 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Uždaryti</button>
-                <button type="submit" id="remove" class="btn btn-danger">Pašalinti</button>
+                <a href="" class="btn btn-warning" id="edit">Redaguoti</a>
+                <button type="submit" id="remove" class="btn btn-danger" hidden>Pašalinti</button>
             </div>
         </div>
     </div>
@@ -111,6 +117,13 @@
             },
             eventClick: function (info) {
                 $('#removeReservation').modal('show');
+                if (moment(info.event.start).isBefore(moment())) {
+                    $('#remove').prop('hidden', true);
+                } else {
+                    $('#remove').prop('hidden', false);
+                }
+                var editReservationUrl = "{{ route('EditReservation', ':id') }}".replace(':id', info.event.extendedProps.id);
+                $('#edit').prop('href', editReservationUrl);
                 $('#lot').text(info.event.extendedProps.parking_name);
                 $('#address').text(info.event.extendedProps.address);
                 $('#space').text(info.event.extendedProps.space_number);

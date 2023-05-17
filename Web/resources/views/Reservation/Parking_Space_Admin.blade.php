@@ -118,7 +118,7 @@
     var dataEvents = '{!! $events !!}';
     document.addEventListener('DOMContentLoaded', function () {
         var calendarEl = document.getElementById('calendar');
-
+        const today = new Date();
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'timeGridWeek',
             slotMinTime: '0:00:00',
@@ -134,7 +134,9 @@
             selectOverlap: false,
             selectLongPressDelay: 100,
             eventLongPressDelay: 200,
-
+            validRange: {
+                start: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000),
+            },
             select: function (info) {
                 var now = moment();
                 var eventStart = info.start;
@@ -144,7 +146,42 @@
                 var color = 'blue';
                 newStart = moment(eventStart).format('YYYY-MM-DDTHH:mm:ss');
                 newEnd = moment(eventEnd).format('YYYY-MM-DDTHH:mm:ss');
-                if (moment(eventEnd).isAfter(now) && eventHours >= 0.5) {
+                var timeCheck = moment().set('second', 0);
+                timeCheck.minute(timeCheck.minute() < 30 ? 0 : 30);
+                var startTime = moment(eventStart, 'YYYY-MM-DD HH:mm:ss').set('second', 0);
+                timeCheck = timeCheck.format('YYYY-MM-DD HH:mm:ss');
+                startTime = startTime.format('YYYY-MM-DD HH:mm:ss');
+
+                if (!moment(startTime).isBefore(timeCheck) && moment(eventEnd).isAfter(now) && eventHours >= 0.5) {
+                    var eventsToRemove = [];
+
+                    selectedEvents.forEach(function (event, index) {
+                        calendar.getEvents().forEach(function (calEvent) {
+                            if (
+                                (moment(eventStart).isSame(moment(event.end)) || moment(eventEnd).isSame(moment(event.start))) &&
+                                (moment(eventStart).isSame(moment(calEvent.end)) || moment(eventEnd).isSame(moment(calEvent.start))) &&
+                                calEvent.backgroundColor == 'blue'
+                            ) {
+                                eventsToRemove.push(calEvent);
+                                if (moment(event.start) < moment(newStart)) {
+                                    newStart = event.start;
+                                }
+                                if (moment(event.end) > moment(newEnd)) {
+                                    newEnd = event.end;
+                                }
+                                return false;
+                            }
+                        });
+                    });
+                    eventsToRemove.forEach(function (calEvent) {
+                        calEvent.remove();
+                        selectedEvents.forEach(function (event, index) {
+                            if (moment(calEvent.start).isSame(moment(event.start)) && moment(calEvent.end).isSame(moment(event.end))) {
+                                selectedEvents.splice(index, 1);
+                            }
+                        });
+                    });
+
                     calendar.addEvent({
                         start: newStart,
                         end: newEnd,
@@ -154,12 +191,17 @@
                         editable: false,
                         durationEditable: false,
                     });
+
                     calendar.render();
+
                     formattedStart = moment(newStart).format('YYYY-MM-DD HH:mm:ss');
                     formattedEnd = moment(newEnd).format('YYYY-MM-DD HH:mm:ss');
                     selectedEvents.push({ start: formattedStart, end: formattedEnd, startUnformatted: newStart, endUnformatted: newEnd });
                 }
+                console.log(selectedEvents);
+                calendar.unselect();
             },
+
             eventClick: function (info) {
                 if (info.event.backgroundColor === 'red' || info.event.backgroundColor === 'darkGreen') {
                     return false;
