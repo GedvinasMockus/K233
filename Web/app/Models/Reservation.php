@@ -26,11 +26,13 @@ class Reservation extends Model
 
     public static function getSpaceAppointments($id)
     {
-        $now = Carbon::now();
-        $weekStartDate = $now->startOfWeek()->format('Y-m-d H:i');
-        $weekEndDate = $now->endOfWeek()->format('Y-m-d H:i');
+        $startOfWeek = Carbon::now()->startOfWeek()->subWeek()->toDateTimeString();
 
-        return DB::table('reservation')->where('fk_Parking_spaceid', '=', $id)->get();
+        $reservations = DB::table('reservation')
+            ->where('fk_Parking_spaceid', '=', $id)
+            ->whereBetween('date_from', [$startOfWeek, '9999-12-31 23:59:59'])
+            ->get();
+        return $reservations;
     }
     public static function getReservations($id)
     {
@@ -44,7 +46,11 @@ class Reservation extends Model
                 'reservation.id', 'reservation.date_from', 'reservation.date_until', 'reservation.full_price', 'parking_space.space_number', 'parking_lot.parking_name',
                 DB::raw("CONCAT(parking_lot.city, ', ', parking_lot.street, ', ', parking_lot.street_number) AS address")
             ])
-            ->where('fk_Userid', '=', $id)->where('date_from', '>=', $nowDate)->get();
+            ->where('fk_Userid', '=', $id)->where('date_until', '>=', $nowDate)->get();
+    }
+    public function parkingSpace()
+    {
+        return $this->belongsTo(ParkingSpace::class, 'fk_Parking_spaceid');
     }
     public $timestamps = false;
 }
