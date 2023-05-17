@@ -8,10 +8,15 @@ const Buffer = require('buffer').Buffer;
 const bcrypt = require('bcrypt');
 const fs = require('fs');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const mime = require('mime-types');
+const path = require('path');
+const axios = require('axios');
+var FormData = require('form-data');
 
 const app = express();
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 const con = mysql.createConnection({
   host: process.env.MYSQL_HOST,
@@ -130,7 +135,7 @@ client.on('message', function (topic, message) {
           }
         );
       } else {
-        createMessageToSend({ status: 'closed' }, getDataFromTTN);
+        createMessageToSend({ status: '3' }, getDataFromTTN);
         console.log('Atstumas perdidelis');
       }
     }
@@ -262,6 +267,55 @@ app.post('/openBarrier/', (req, resData, next) => {
       } else {
         resData.json('Vartotojo informacija nerasta!');
       }
+    }
+  );
+});
+
+app.post('/sendReport/', (req, resData, next) => {
+  const { image, description, email } = req.body;
+  const decodedImage = Buffer.from(image, 'base64');
+  const extension = mime.extension('image/png');
+  if (!extension) {
+    return resData.status(400).json('Blogas paveiklsiuko formatas!');
+  }
+  const filename = `${uuidv4()}.${extension}`;
+  const imagePath = path.join(__dirname, 'image', filename);
+  fs.writeFile(imagePath, decodedImage, (err) => {
+    if (err) {
+      return resData.status(500).json('Klaida išsaugant paveiksliuką!');
+    }
+    const config = {
+      headers: {
+        'api-key': process.env.API_KEY,
+        'Content-Type': 'multipart/form-data',
+      },
+    };
+    const formData = new FormData();
+    formData.append('description', description);
+    formData.append('email', email);
+    formData.append('parking_lot', '1');
+    formData.append('image', fs.createReadStream(imagePath));
+    axios
+      .post('http://78.62.39.220/api/uploadReport', formData, config)
+      .then((response) => {
+        fs.unlink(imagePath, (unlinkErr) => {
+          if (unlinkErr) {
+            console.error(unlinkErr);
+          }
+          resData.status(200).json(response.data);
+        });
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  });
+});
+
+app.get('/parkingLot/', (req, resData, next) => {
+  con.query(
+    "SELECT `id`, `parking_name`, CONCAT(`city`, ', ', `street`, ' ', `street_number`) AS `address` FROM `parking_lot`",
+    function (error, results, fields) {
+      resData.json(results);
     }
   );
 });
