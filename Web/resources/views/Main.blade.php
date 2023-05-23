@@ -35,6 +35,9 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNavDropdown">
                     <ul class="navbar-nav ms-start">
+                        <li class="nav-item">
+                            <a href="{{ route('DisplayParkingLots') }}" class="nav-link text-uppercase">Aikštelės</a>
+                        </li>
                         @auth
                         <li class="nav-item">
                             <a href="{{ route('DisplayReservations') }}" class="nav-link text-uppercase">Rezervacijos</a>
@@ -71,6 +74,9 @@
                             <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
                                 <li>
                                     <a class="dropdown-item" href="{{ route('DisplayUserProfile') }}">Mano profilis</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ route('DisplayHistory') }}">Mano istorija</a>
                                 </li>
                                 <li>
                                     <hr class="dropdown-divider" />

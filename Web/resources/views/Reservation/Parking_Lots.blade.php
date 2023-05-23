@@ -18,17 +18,17 @@
                         <tr>
                             <th>Pavadinimas</th>
                             <th>Adresas</th>
-                            <th></th>
+                            {{-- <th></th> --}}
                         </tr>
                         @foreach($lots as $lot)
                         <tr data-href="/Parking_Lot/{{$lot->id}}">
                             <td>{{$lot->parking_name}}</td>
                             <td>{{$lot->city}} {{$lot->street}} {{$lot->street_number}}</td>
-                            @auth
+                            {{-- @auth
                                 @if(Auth::user()->isAdmin())
                                     <td><a href="/Edit_Parking_Lot/1" class="btn btn-danger">Redaguoti</a></td>
                                 @endif
-                            @endauth
+                            @endauth --}}
                         </tr>
                         @endforeach
                     </table>
