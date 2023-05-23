@@ -4,10 +4,10 @@
         <div class="card">
             <div class="card-header">Aikštelės</div>
             <div class="card-body">Parkingas nr {{ $id }}</div>
-            {{-- <div class="containerofmap" id="image" style="background: url(<?php echo $photo; ?>) no-repeat;max-width:100%" onload="mapLoaded()"></div> --}}
+            {{-- <div class="containerofmap" id="image" style="background: url(<?php echo $photo; ?>) no-repeat;max-width:100%"></div> --}}
 
             <div class="containerofmap"> 
-                <img id="image" style="max-width:100%" onresize="mapResized()" class="image" src="<?php echo $photo; ?>">
+                <img id="image" style="max-width:100%" class="image" src="<?php echo $photo; ?>">
             </div>
 
             <div class="row mt-5 mb-5">
@@ -76,7 +76,6 @@
         polyLine.setAttribute("points", pts);
         polyLine.setAttribute("href", "/Parking_Space/" + space['id']);
         $("#svg").append(polyLine);
-        // console.log("small load");
     }
 
     function onClick(elem) {
