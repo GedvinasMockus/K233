@@ -42,6 +42,7 @@ class ReportController extends Controller
             $report->text = $data['description'];
             $report->fk_Userid = $user->id;
             $report->fk_Parking_lotid = $data['parking_lot'];
+            $report->answered = 0;
             $report->save();
             if (!is_null($request->file('image'))) {
                 $images = $request->file('image');
