@@ -52,5 +52,20 @@ class Reservation extends Model
     {
         return $this->belongsTo(ParkingSpace::class, 'fk_Parking_spaceid');
     }
+
+    public static function getHistory($id)
+    {
+        $currentdate = Carbon::now()->toDateTimeString();
+        $data = DB::table('reservation')
+            ->join('parking_space', 'reservation.fk_Parking_spaceid', '=', 'parking_space.id')
+            ->join('parking_lot', 'parking_space.fk_Parking_lotid', '=', 'parking_lot.id')
+            ->select([
+                'reservation.id', 'reservation.date_from', 'reservation.date_until', 'reservation.full_price', 'parking_space.space_number', 'parking_lot.parking_name',
+                DB::raw("CONCAT(parking_lot.city, ', ', parking_lot.street, ', ', parking_lot.street_number) AS address")
+            ])
+            ->where('fk_Userid', $id)
+            ->where('date_until', '<=', $currentdate)->get();
+        return $data;
+    }
     public $timestamps = false;
 }

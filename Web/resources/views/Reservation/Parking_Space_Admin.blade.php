@@ -233,6 +233,10 @@
                 formData.append('start[]', selectedEvents[i].start);
                 formData.append('end[]', selectedEvents[i].end);
             }
+            if (selectedEvents.length == 0) {
+                formData.append('start', []);
+                formData.append('end', []);
+            }
             formData.set('id', '{!! $space->id !!}');
             formData.set('user', selectedUser);
             $.ajaxSetup({

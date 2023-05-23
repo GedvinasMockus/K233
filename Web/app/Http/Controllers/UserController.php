@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\SendRegistrationConfirmJob;
 use App\Models\Payment;
+use App\Models\Reservation;
 use App\Models\User;
 use App\Rules\PaymentTimeRule;
 use Exception;
@@ -369,12 +370,27 @@ class UserController extends Controller
 
     public function DisplayHistory()
     {
-        $id = Auth::user()->id;
-        $currentdate = Carbon::now()->toDateTimeString();
-
-        $pastreservations = DB::table('reservation')->join('parking_space', 'reservation.fk_Parking_spaceid', '=', 'parking_space.id')->join('parking_lot', 'parking_space.fk_Parking_lotid', '=', 'parking_lot.id')->select('reservation.id', 'reservation.date_from', 'reservation.date_until', 'parking_lot.parking_name')->where('fk_Userid', $id)->where('date_until', '<=', $currentdate)->get();
-
-        return view('Profile.History', ['pastreservations' => $pastreservations]);
+        $user = Auth::user();
+        $reservations = Reservation::getHistory($user->id);
+        $events = [];
+        foreach ($reservations as $reservation) {
+            $description = [
+                'parking_name' => $reservation->parking_name,
+                'space_number' => $reservation->space_number,
+                'address' => $reservation->address,
+                'id' => $reservation->id,
+                'price' => $reservation->full_price
+            ];
+            $events[] = [
+                'start' => $reservation->date_from,
+                'end' => $reservation->date_until,
+                'backgroundColor' =>  "grey",
+                'title' => "Jūsų rezervacija",
+                'extendedProps' => $description,
+            ];
+        }
+        $events = json_encode($events);
+        return view('Profile.History')->with(['events' => $events]);
     }
 
     public function DisplayChangeStatus($id)

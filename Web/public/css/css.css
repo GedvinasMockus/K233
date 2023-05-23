@@ -40,4 +40,6 @@ polygon {
     stroke: rgb(106, 247, 106);
     stroke-width: 1;
 }
-
+.fancybox__container {
+    z-index: 1000000 !important;
+}

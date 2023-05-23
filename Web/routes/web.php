@@ -116,3 +116,7 @@ Route::get('/Test', [ReservationController::class, 'Test'])->name('Test');
 Route::Get('/DataReport', [AdminController::class, 'DisplayDataReport'])->name('DisplayDataReport');
 
 Route::post('/generatedatareport', [AdminController::class, 'GenerateDataReport'])->name('GenerateDataReport');
+
+Route::Get('/reports', [AdminController::class, 'DisplayReports'])->name('DisplayReports');
+
+Route::post('/answerReport', [AdminController::class, 'AnswerToReport'])->name('AnswerToReport');

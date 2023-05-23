@@ -6,6 +6,7 @@ use App\Models\ParkingSpace;
 use App\Models\Reservation;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Facades\Log;
 
 class ReservationConflictAdminRule implements ValidationRule
 {
@@ -23,6 +24,9 @@ class ReservationConflictAdminRule implements ValidationRule
     }
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
+        if (empty($this->startDate) || empty($this->endDate)) {
+            $fail('Prašome pasirinkti rezervuojamą laiką!');
+        }
         for ($i = 0; $i < sizeof($this->startDate); $i++) {
             $conflicts = Reservation::where('fk_Parking_spaceid', $this->spaceId)
                 ->where(function ($query) use ($i) {
