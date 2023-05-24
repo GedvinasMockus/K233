@@ -272,43 +272,47 @@ app.post('/openBarrier/', (req, resData, next) => {
 });
 
 app.post('/sendReport/', (req, resData, next) => {
-  const { image, description, email } = req.body;
-  const decodedImage = Buffer.from(image, 'base64');
-  const extension = mime.extension('image/png');
-  if (!extension) {
-    return resData.status(400).json('Blogas paveiklsiuko formatas!');
-  }
-  const filename = `${uuidv4()}.${extension}`;
-  const imagePath = path.join(__dirname, 'image', filename);
-  fs.writeFile(imagePath, decodedImage, (err) => {
-    if (err) {
-      return resData.status(500).json('Klaida išsaugant paveiksliuką!');
+  try {
+    const { image, description, email, parkingId } = req.body;
+    const decodedImage = Buffer.from(image, 'base64');
+    const extension = mime.extension('image/png');
+    if (!extension) {
+      return resData.status(400).json('Blogas paveiklsiuko formatas!');
     }
-    const config = {
-      headers: {
-        'api-key': process.env.API_KEY,
-        'Content-Type': 'multipart/form-data',
-      },
-    };
-    const formData = new FormData();
-    formData.append('description', description);
-    formData.append('email', email);
-    formData.append('parking_lot', '1');
-    formData.append('image', fs.createReadStream(imagePath));
-    axios
-      .post('http://78.62.39.220/api/uploadReport', formData, config)
-      .then((response) => {
-        fs.unlink(imagePath, (unlinkErr) => {
-          if (unlinkErr) {
-            console.error(unlinkErr);
-          }
-          resData.status(200).json(response.data);
+    const filename = `${uuidv4()}.${extension}`;
+    const imagePath = path.join(__dirname, 'image', filename);
+    fs.writeFile(imagePath, decodedImage, (err) => {
+      if (err) {
+        return resData.status(500).json('Klaida išsaugant paveiksliuką!');
+      }
+      const config = {
+        headers: {
+          'api-key': process.env.API_KEY,
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+      const formData = new FormData();
+      formData.append('description', description);
+      formData.append('email', email);
+      formData.append('parking_lot', parkingId);
+      formData.append('image', fs.createReadStream(imagePath));
+      axios
+        .post('http://78.62.39.220/api/uploadReport', formData, config)
+        .then((response) => {
+          fs.unlink(imagePath, (unlinkErr) => {
+            if (unlinkErr) {
+              console.error(unlinkErr);
+            }
+            resData.status(200).json(response.data);
+          });
+        })
+        .catch((error) => {
+          console.error(error);
         });
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  });
+    });
+  } catch (err) {
+    console.log('error');
+  }
 });
 
 app.get('/parkingLot/', (req, resData, next) => {
