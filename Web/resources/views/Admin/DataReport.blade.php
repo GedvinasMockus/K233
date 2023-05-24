@@ -3,30 +3,35 @@
     <span class="message" id="errorPlaceSpan" hidden></span>
 </div>
 <div class="row justify-content-center">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
-            <div class="card-header">Duomenų ataskaitos generavimas</div>
-            <div class="card-body">
-                <label for="from">Nuo:</label>
-                <input type="date" id="from" name="from">
-                <label for="to">Iki:</label>
-                <input type="date" id="to" name="to">
-
+            <div class="d-grid gap-3 p-2">
+                <blockquote class="blockquote">
+                    <p class="p-2">
+                        <b>Duomenų ataskaitos generavimas</b>
+                    </p>
+                    <hr class="dropdown-divider" />
+                </blockquote>
+            </div>
+            <div class="row p-2">
+                <div class="col-6 p-2"><span for="from">Nuo:</span> <input type="date" id="from" name="from" /></div>
+                <div class="col-6 p-2"><span for="to">Iki:</span> <input type="date" id="to" name="to" /></div>
+            </div>
+            <div class="d-grid gap-3 p-2">
                 <button onclick="onSave(this)" id="">Generuoti ataskaitą</button>
-
                 <div class="alert alert-secondary mt-2" id="ReservationCountPlace" hidden>
                     <span class="message" id="ReservationCountSpan"></span>
                 </div>
-                <div class="d-grid p-2">
-                    <table class="table table-hover" id="list" hidden>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nuo</th>
-                            <th>Iki</th>
-                            <th>Kaina</th>
-                        </tr>
-                    </table>
-                </div>
+            </div>
+            <div class="d-grid p-2">
+                <table class="table table-hover" id="list" hidden>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nuo</th>
+                        <th>Iki</th>
+                        <th>Kaina</th>
+                    </tr>
+                </table>
             </div>
         </div>
     </div>
@@ -34,26 +39,26 @@
 @endsection('content') @section('scripts')
 <script>
     function onSave() {
-        var from = document.getElementById("from").value;
-        var to = document.getElementById("to").value;
+        var from = document.getElementById('from').value;
+        var to = document.getElementById('to').value;
 
         $(function () {
             $.ajaxSetup({
                 headers: {
-                    "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr("content"),
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
                 },
             });
             $.ajax({
-                method: "post",
-                url: "/generatedatareport",
+                method: 'post',
+                url: '/generatedatareport',
                 data: {
                     from: from,
                     to: to,
                 },
                 success: function (data) {
-                    var table = document.getElementById("list")
+                    var table = document.getElementById('list');
 
-                    $("#list").find("tr:not(:first)").remove();
+                    $('#list').find('tr:not(:first)').remove();
 
                     $('#ReservationCountPlace').prop('hidden', true);
                     $('#list').prop('hidden', true);
@@ -74,16 +79,14 @@
 
                         $('#errorPlaceSpan').html(errorMessage);
                     } else {
-                        
                         $('#ReservationCountPlace').prop('hidden', false);
                         $('#ReservationCountSpan').html('Rezervacijų kiekis šiame laiko tarpe: ' + data.count + '!');
 
-                        if(data.count > 0)
-                        {
+                        if (data.count > 0) {
                             $('#list').prop('hidden', false);
                             var tableBody = document.createElement('tbody');
 
-                            data.reservations.forEach( function(rowData) {
+                            data.reservations.forEach(function (rowData) {
                                 var row = document.createElement('tr');
 
                                 var cell = document.createElement('td');
