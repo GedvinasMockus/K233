@@ -48,6 +48,7 @@
                             <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink">
                                 <li><a class="dropdown-item" href="{{ route('DisplayDataReport') }}">Duomenų ataskaitos generavimas</a></li>
                                 <li><a class="dropdown-item" href="{{ route('DisplayReports') }}">Pažeidimai</a></li>
+                                <li><a class="dropdown-item" href="{{ route('DisplayProfiles') }}">Vartotojų sąrašas</a></li>
                             </ul>
                         </li>
                         @endif @endauth

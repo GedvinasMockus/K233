@@ -141,7 +141,6 @@ class ReservationController extends Controller
             return response()->json(['status' => 1, 'events' => $events]);
         }
     }
-
     public function DisplayReservations(Request $request)
     {
         $user = Auth::user();
@@ -230,12 +229,15 @@ class ReservationController extends Controller
                 DB::raw('FORMAT(TIMESTAMPDIFF(MINUTE, reservation.date_from, reservation.date_until) / 60, IF(FLOOR(TIMESTAMPDIFF(MINUTE, reservation.date_from, reservation.date_until) / 60) = (TIMESTAMPDIFF(MINUTE, reservation.date_from, reservation.date_until) / 60), 0, 1)) AS hour_amount')
             )
             ->where('reservation.id', '=', $id)
+            ->where('reservation.date_until', '>=', Carbon::now()->toDateTimeString())
             ->first();
-
-
+        $user = Auth::user();
+        if (!$lot || $lot->fk_Userid != $user->id) {
+            return abort(404);
+        }
         $space = Reservation::findOrFail($lot->fk_Parking_spaceid);
         $reservations = Reservation::getSpaceAppointments($space->id);
-        $user = Auth::user();
+
         $events = [];
 
         foreach ($reservations as $reservation) {

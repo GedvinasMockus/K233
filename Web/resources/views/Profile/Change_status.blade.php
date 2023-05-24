@@ -1,16 +1,23 @@
 @extends('main') @section('content')
 <div class="row justify-content-center">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
-            <div class="card-header">Vartotojo statuso keitimas</div>
-            <div class="card-body">
-                Vartotojas {{$user->name}} {{$user->surname}}
+            <div class="d-grid gap-3 p-2">
+                <blockquote class="blockquote">
+                    <p class="p-2">
+                        <b>Vartotojo statuso keitimas</b>
+                    </p>
+                    <hr class="dropdown-divider" />
+                </blockquote>
+                <span class="p-2 fw-bold">Vartotojas {{$user->name}} {{$user->surname}}</span>
+            </div>
+            <div class="d-grid gap-3 p-2">
                 <form method="POST" action="{{ route('ChangeStatus') }}">
                     @csrf
 
                     <input type="hidden" name="userid" value="{{ $user->id }}" />
 
-                    <div class="row mt-5 mb-5">
+                    <div class="row p-2">
                         <div class="col-sm-4">
                             <label for="status">Vartotojo statusas:</label>
                             <select class="form-control" name="status" id="status">
@@ -22,10 +29,10 @@
                             </select>
                         </div>
                     </div>
-                    <div class="row mb-0">
-                        <div class="col-md-8 offset-md-4">
+                    <div class="row p-2">
+                        <div class="col-12 p-2 text-center">
                             <button type="submit" class="btn btn-primary">
-                                {{ __("Pakeisti") }}
+                                {{ __('Pakeisti') }}
                             </button>
                         </div>
                     </div>
@@ -34,4 +41,5 @@
         </div>
     </div>
 </div>
+
 @endsection('content')

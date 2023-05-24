@@ -1,16 +1,26 @@
 @extends('main') @section('content')
+
 <div class="row justify-content-center">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
-            <div class="card-header">Aikštelės</div>
-            <div class="card-body">Parkingas nr {{ $id }}</div>
-            {{-- <div class="containerofmap" id="image" style="background: url(<?php echo $photo; ?>) no-repeat;max-width:100%"></div> --}}
-
-            <div class="containerofmap"> 
-                <img id="image" style="max-width:100%" class="image" src="<?php echo $photo; ?>">
+            <div class="d-grid gap-3 p-2">
+                <blockquote class="blockquote">
+                    <p class="p-2">
+                        <b>Aikštelės</b>
+                    </p>
+                    <hr class="dropdown-divider" />
+                </blockquote>
+                <span class="p-2 fw-bold">Aikštelė numeris: {{ $id }}</span>
             </div>
-
-            <div class="row mt-5 mb-5">
+            <div class="d-grid gap-3 p-2">
+                {{--
+                <div class="containerofmap" id="image" style="background: url(<?php echo $photo; ?>) no-repeat; max-width: 100%"></div>
+                --}}
+                <div class="containerofmap text-center">
+                    <img id="image" style="max-width: 100%" class="image" src="<?php echo $photo; ?>" />
+                </div>
+            </div>
+            <div class="d-grid gap-3 p-2">
                 <div class="col-12 text-center">
                     <a href="{{ route('DisplayParkingLots') }}" class="btn btn-primary">Aikštelių sąrašas</a>
                 </div>
@@ -18,6 +28,7 @@
         </div>
     </div>
 </div>
+
 @endsection('content') @section('scripts')
 <script>
     var spaces = {!! json_encode($spaces->toArray(), JSON_HEX_TAG) !!}
@@ -36,7 +47,7 @@
     img.onload = function () {
         spaces.forEach(createSvg);
     }
-    
+
     $(document).ready(function () {
         img.src = path;
         oheight = img.height;
@@ -54,7 +65,7 @@
         $('<svg class="hover" id="svg">' + "</svg>").appendTo(".containerofmap");
 
         document.getElementById("svg").setAttribute("style", "height: " + height + "px; width:" + width + "px; margin-left: -" + width + "px;");
-    }); 
+    });
 
     // window.addEventListener('resize', function(event){
     //     let box = document.getElementById('image');
